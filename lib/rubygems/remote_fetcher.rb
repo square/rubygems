@@ -84,6 +84,9 @@ class Gem::RemoteFetcher
   def api_endpoint(uri)
     host = uri.host
 
+    # TODO: Spec/justify
+    return uri if uri.host == 'localhost'
+
     begin
       res = @dns.getresource "_rubygems._tcp.#{host}",
                              Resolv::DNS::Resource::IN::SRV
