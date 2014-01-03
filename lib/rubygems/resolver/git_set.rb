@@ -11,6 +11,12 @@
 class Gem::Resolver::GitSet < Gem::Resolver::Set
 
   ##
+  # The root directory for git gems in this set.  This is usually Gem.dir, the
+  # installation directory for regular gems.
+
+  attr_accessor :root_dir
+
+  ##
   # Contains repositories needing submodules
 
   attr_reader :need_submodules # :nodoc:
@@ -30,6 +36,7 @@ class Gem::Resolver::GitSet < Gem::Resolver::Set
     @git             = ENV['git'] || 'git'
     @need_submodules = {}
     @repositories    = {}
+    @root_dir        = Gem.dir
     @specs           = {}
   end
 
@@ -39,41 +46,72 @@ class Gem::Resolver::GitSet < Gem::Resolver::Set
   end
 
   ##
+  # Adds and returns a GitSpecification with the given +name+ and +version+
+  # which came from a +repository+ at the given +reference+.  If +submodules+
+  # is true they are checked out along with the repository.
+  #
+  # This fills in the prefetch information as enough information about the gem
+  # is present in the arguments.
+
+  def add_git_spec name, version, repository, reference, submodules # :nodoc:
+    add_git_gem name, repository, reference, submodules
+
+    source = Gem::Source::Git.new name, repository, reference
+    source.root_dir = @root_dir
+
+    spec = Gem::Specification.new do |s|
+      s.name    = name
+      s.version = version
+    end
+
+    git_spec = Gem::Resolver::GitSpecification.new self, spec, source
+
+    @specs[spec.name] = git_spec
+
+    git_spec
+  end
+
+  ##
   # Finds all git gems matching +req+
 
   def find_all req
-    @repositories.keys.select do |name|
-      name == req.name
-    end.map do |name|
-      @specs[name] || load_spec(name)
-    end.select do |spec|
+    prefetch nil
+
+    specs.values.select do |spec|
       req.matches_spec? spec
     end
-  end
-
-  def load_spec name # :nodoc:
-    repository, reference = @repositories[name]
-
-    source = Gem::Source::Git.new name, repository, reference
-
-    spec = source.load_spec name
-
-    git_spec =
-      Gem::Resolver::GitSpecification.new self, spec, source
-
-    @specs[name] = git_spec
   end
 
   ##
   # Prefetches specifications from the git repositories in this set.
 
   def prefetch reqs
-    names = reqs.map { |req| req.name }
+    return unless @specs.empty?
 
-    @repositories.each_key do |name|
-      next unless names.include? name
+    @repositories.each do |name, (repository, reference)|
+      source = Gem::Source::Git.new name, repository, reference
+      source.root_dir = @root_dir
 
-      load_spec name
+      source.specs.each do |spec|
+        git_spec = Gem::Resolver::GitSpecification.new self, spec, source
+
+        @specs[spec.name] = git_spec
+      end
+    end
+  end
+
+  def pretty_print q # :nodoc:
+    q.group 2, '[GitSet', ']' do
+      next if @repositories.empty?
+      q.breakable
+
+      repos = @repositories.map do |name, (repository, reference)|
+        "#{name}: #{repository}@#{reference}"
+      end
+
+      q.seplist repos do |repo|
+        q.text repo
+      end
     end
   end
 

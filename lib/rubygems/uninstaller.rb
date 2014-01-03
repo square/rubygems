@@ -237,7 +237,7 @@ class Gem::Uninstaller
     unless path_ok?(@gem_home, spec) or
            (@user_install and path_ok?(Gem.user_dir, spec)) then
       e = Gem::GemNotInHomeException.new \
-            "Gem is not installed in directory #{@gem_home}"
+            "Gem '#{spec.full_name}' is not installed in directory #{@gem_home}"
       e.spec = spec
 
       raise e
@@ -247,7 +247,7 @@ class Gem::Uninstaller
       File.writable?(spec.base_dir)
 
     FileUtils.rm_rf spec.full_gem_path
-    FileUtils.rm_rf spec.extension_install_dir
+    FileUtils.rm_rf spec.extension_dir
 
     old_platform_name = spec.original_name
     gemspec           = spec.spec_file

@@ -115,7 +115,7 @@ class Gem::RequestSet::GemDependencyAPI
   ##
   # A Hash containing gem names and files to require from those gems.
 
-  attr_reader :requires
+  attr_reader :requires # :nodoc:
 
   ##
   # A set of gems that are loaded via the +:path+ option to #gem
@@ -125,7 +125,7 @@ class Gem::RequestSet::GemDependencyAPI
   ##
   # The groups of gems to exclude from installation
 
-  attr_accessor :without_groups
+  attr_accessor :without_groups # :nodoc:
 
   ##
   # Creates a new GemDependencyAPI that will add dependencies to the
@@ -221,13 +221,7 @@ class Gem::RequestSet::GemDependencyAPI
 
     return unless (groups & @without_groups).empty?
 
-    unless source_set then
-      raise ArgumentError,
-        "duplicate source (default) for gem #{name}" if
-          @gem_sources.include? name
-
-      @gem_sources[name] = :default
-    end
+    pin_gem_source name, :default unless source_set
 
     gem_requires name, options
 
@@ -246,9 +240,7 @@ class Gem::RequestSet::GemDependencyAPI
 
     return unless repository = options.delete(:git)
 
-    raise ArgumentError,
-      "duplicate source git: #{repository} for gem #{name}" if
-        @gem_sources.include? name
+    pin_gem_source name, :git, repository
 
     reference = nil
     reference ||= options.delete :ref
@@ -259,8 +251,6 @@ class Gem::RequestSet::GemDependencyAPI
     submodules = options.delete :submodules
 
     @git_set.add_git_gem name, repository, reference, submodules
-
-    @gem_sources[name] = repository
 
     true
   end
@@ -281,6 +271,8 @@ class Gem::RequestSet::GemDependencyAPI
 
     true
   end
+
+  private :gem_github
 
   ##
   # Handles the :group and :groups +options+ for the gem with the given
@@ -308,13 +300,9 @@ class Gem::RequestSet::GemDependencyAPI
   def gem_path name, options # :nodoc:
     return unless directory = options.delete(:path)
 
-    raise ArgumentError,
-      "duplicate source path: #{directory} for gem #{name}" if
-        @gem_sources.include? name
+    pin_gem_source name, :path, directory
 
     @vendor_set.add_vendor_gem name, directory
-
-    @gem_sources[name] = directory
 
     true
   end
@@ -361,7 +349,7 @@ class Gem::RequestSet::GemDependencyAPI
   def gem_requires name, options # :nodoc:
     if options.include? :require then
       if requires = options.delete(:require) then
-        @requires[name].concat requires
+        @requires[name].concat Array requires
       end
     else
       @requires[name] << name
@@ -369,6 +357,11 @@ class Gem::RequestSet::GemDependencyAPI
   end
 
   private :gem_requires
+
+  ##
+  # :category: Gem Dependencies DSL
+  #
+  # Block form for specifying gems from a git +repository+.
 
   def git repository
     @current_repository = repository
@@ -423,7 +416,31 @@ class Gem::RequestSet::GemDependencyAPI
   end
 
   ##
+  # Pins the gem +name+ to the given +source+.  Adding a gem with the same
+  # name from a different +source+ will raise an exception.
+
+  def pin_gem_source name, type = :default, source = nil
+    source_description =
+      case type
+      when :default then '(default)'
+      when :path    then "path: #{source}"
+      when :git     then "git: #{source}"
+      else               '(unknown)'
+      end
+
+    raise ArgumentError,
+      "duplicate source #{source_description} for gem #{name}" if
+        @gem_sources.fetch(name, source) != source
+
+    @gem_sources[name] = source
+  end
+
+  private :pin_gem_source
+
+  ##
   # :category: Gem Dependencies DSL
+  #
+  # Block form for restricting gems to a particular platform.
 
   def platform what
     @current_platform = what
@@ -436,6 +453,8 @@ class Gem::RequestSet::GemDependencyAPI
 
   ##
   # :category: Gem Dependencies DSL
+  #
+  # Block form for restricting gems to a particular platform.
 
   alias :platforms :platform
 

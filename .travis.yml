@@ -2,10 +2,13 @@
 after_script:
 - rake travis:after -t
 before_script:
-- gem uninstall executable-hooks -x
+- gem uninstall executable-hooks -x --force -i `gem env home`@global
+- gem install rake --no-doc
 - gem install hoe-travis --no-rdoc --no-ri
 - gem install minitest -v '~> 4.7' --no-rdoc --no-ri
 - rake travis:before -t
+- gem list --details
+- gem env
 language: ruby
 notifications:
   email:
@@ -13,9 +16,11 @@ notifications:
   - evan+notify@phx.io
   - kou@cozmixng.org
 rvm:
+- 1.8.7
 - 1.9.2
 - 1.9.3
 - 2.0.0
+- 2.1.0
 - ruby-head
 env:
   - "YAML=syck"
@@ -23,7 +28,11 @@ env:
 script: rake travis
 matrix:
   exclude:
+    - rvm: 1.8.7
+      env: "YAML=psych"
     - rvm: 2.0.0
+      env: "YAML=syck"
+    - rvm: 2.1.0
       env: "YAML=syck"
     - rvm: ruby-head
       env: "YAML=syck"

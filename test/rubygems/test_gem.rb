@@ -230,6 +230,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_self_detect_gemdeps
+    skip 'Insecure operation - chdir' if RUBY_VERSION <= "1.8.7"
     rubygems_gemdeps, ENV['RUBYGEMS_GEMDEPS'] = ENV['RUBYGEMS_GEMDEPS'], '-'
 
     FileUtils.mkdir_p 'detect/a/b'
@@ -338,7 +339,7 @@ class TestGem < Gem::TestCase
     end
   end
 
-  def test_self_extension_install_dir_shared
+  def test_self_extension_dir_shared
     enable_shared, RbConfig::CONFIG['ENABLE_SHARED'] =
       RbConfig::CONFIG['ENABLE_SHARED'], 'yes'
 
@@ -347,7 +348,7 @@ class TestGem < Gem::TestCase
     RbConfig::CONFIG['ENABLE_SHARED'] = enable_shared
   end
 
-  def test_self_extension_install_dir_static
+  def test_self_extension_dir_static
     enable_shared, RbConfig::CONFIG['ENABLE_SHARED'] =
       RbConfig::CONFIG['ENABLE_SHARED'], 'no'
 
@@ -583,6 +584,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_self_refresh
+    skip 'Insecure operation - mkdir' if RUBY_VERSION <= "1.8.7"
     util_make_gems
 
     a1_spec = @a1.spec_file
@@ -602,6 +604,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_self_refresh_keeps_loaded_specs_activated
+    skip 'Insecure operation - mkdir' if RUBY_VERSION <= "1.8.7"
     util_make_gems
 
     a1_spec = @a1.spec_file
@@ -857,6 +860,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_self_needs_picks_up_unresolved_deps
+    skip 'loading from unsafe file' if RUBY_VERSION <= "1.8.7"
     save_loaded_features do
       util_clear_gems
       a = util_spec "a", "1"
@@ -949,6 +953,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_load_plugins
+    skip 'Insecure operation - chdir' if RUBY_VERSION <= "1.8.7"
     plugin_path = File.join "lib", "rubygems_plugin.rb"
 
     Dir.chdir @tempdir do
@@ -1102,6 +1107,7 @@ class TestGem < Gem::TestCase
   end
 
   def test_auto_activation_of_detected_gemdeps_file
+    skip 'Insecure operation - chdir' if RUBY_VERSION <= "1.8.7"
     util_clear_gems
 
     a = new_spec "a", "1", nil, "lib/a.rb"
@@ -1243,6 +1249,80 @@ class TestGem < Gem::TestCase
       Object.send :remove_const, :RUBY_ENGINE
       Object.const_set :RUBY_ENGINE, engine if engine
     end
+  end
+
+  def test_use_gemdeps
+    rubygems_gemdeps, ENV['RUBYGEMS_GEMDEPS'] = ENV['RUBYGEMS_GEMDEPS'], nil
+
+    spec = util_spec 'a', 1
+
+    refute spec.activated?
+
+    open 'Gemfile', 'w' do |io|
+      io.write 'gem "a"'
+    end
+
+    Gem.use_gemdeps
+
+    refute spec.activated?
+  ensure
+    ENV['RUBYGEMS_GEMDEPS'] = rubygems_gemdeps
+  end
+
+  def test_use_gemdeps_automatic
+    skip 'Insecure operation - chdir' if RUBY_VERSION <= "1.8.7"
+    rubygems_gemdeps, ENV['RUBYGEMS_GEMDEPS'] = ENV['RUBYGEMS_GEMDEPS'], '-'
+
+    spec = util_spec 'a', 1
+
+    refute spec.activated?
+
+    open 'Gemfile', 'w' do |io|
+      io.write 'gem "a"'
+    end
+
+    Gem.use_gemdeps
+
+    assert spec.activated?
+  ensure
+    ENV['RUBYGEMS_GEMDEPS'] = rubygems_gemdeps
+  end
+
+  def test_use_gemdeps_disabled
+    rubygems_gemdeps, ENV['RUBYGEMS_GEMDEPS'] = ENV['RUBYGEMS_GEMDEPS'], ''
+
+    spec = util_spec 'a', 1
+
+    refute spec.activated?
+
+    open 'Gemfile', 'w' do |io|
+      io.write 'gem "a"'
+    end
+
+    Gem.use_gemdeps
+
+    refute spec.activated?
+  ensure
+    ENV['RUBYGEMS_GEMDEPS'] = rubygems_gemdeps
+  end
+
+  def test_use_gemdeps_specific
+    skip 'Insecure operation - read' if RUBY_VERSION <= "1.8.7"
+    rubygems_gemdeps, ENV['RUBYGEMS_GEMDEPS'] = ENV['RUBYGEMS_GEMDEPS'], 'x'
+
+    spec = util_spec 'a', 1
+
+    refute spec.activated?
+
+    open 'x', 'w' do |io|
+      io.write 'gem "a"'
+    end
+
+    Gem.use_gemdeps
+
+    assert spec.activated?
+  ensure
+    ENV['RUBYGEMS_GEMDEPS'] = rubygems_gemdeps
   end
 
   def with_plugin(path)

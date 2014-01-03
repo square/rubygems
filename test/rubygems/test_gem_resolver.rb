@@ -44,6 +44,21 @@ class TestGemResolver < Gem::TestCase
     assert_equal [index_set, vendor_set], composed.sets
   end
 
+  def test_self_compose_sets_nest
+    index_set  = @DR::IndexSet.new
+    vendor_set = @DR::VendorSet.new
+
+    inner = @DR.compose_sets index_set, vendor_set
+
+    current_set = @DR::CurrentSet.new
+
+    composed = @DR.compose_sets inner, current_set
+
+    assert_kind_of Gem::Resolver::ComposedSet, composed
+
+    assert_equal [index_set, vendor_set, current_set], composed.sets
+  end
+
   def test_self_compose_sets_nil
     index_set  = @DR::IndexSet.new
 
@@ -82,6 +97,39 @@ class TestGemResolver < Gem::TestCase
     res.handle_conflict r3, existing
 
     assert_equal 2, res.conflicts.length
+  end
+
+  def test_requests
+    a1 = util_spec 'a', 1, 'b' => 2
+
+    r1 = Gem::Resolver::DependencyRequest.new dep('a', '= 1'), nil
+
+    act = Gem::Resolver::ActivationRequest.new a1, r1, false
+
+    res = Gem::Resolver.new [a1]
+
+    reqs = Gem::Resolver::RequirementList.new
+
+    res.requests a1, act, reqs
+
+    assert_equal ['b (= 2)'], reqs.to_a.map { |req| req.to_s }
+  end
+
+  def test_requests_ignore_dependencies
+    a1 = util_spec 'a', 1, 'b' => 2
+
+    r1 = Gem::Resolver::DependencyRequest.new dep('a', '= 1'), nil
+
+    act = Gem::Resolver::ActivationRequest.new a1, r1, false
+
+    res = Gem::Resolver.new [a1]
+    res.ignore_dependencies = true
+
+    reqs = Gem::Resolver::RequirementList.new
+
+    res.requests a1, act, reqs
+
+    assert_empty reqs
   end
 
   def test_no_overlap_specificly
@@ -136,6 +184,7 @@ class TestGemResolver < Gem::TestCase
     a2_p1   = a3_p2 = nil
 
     spec_fetcher do |fetcher|
+              fetcher.spec 'a', 2
       a2_p1 = fetcher.spec 'a', 2 do |s| s.platform = Gem::Platform.local end
       a3_p2 = fetcher.spec 'a', 3 do |s| s.platform = unknown end
     end
@@ -212,14 +261,27 @@ class TestGemResolver < Gem::TestCase
     res = Gem::Resolver.new([ad, bd], s)
 
     assert_resolves_to [a1, b1, c1, d4], res
+  end
 
-    cons = res.conflicts
+  def test_backoff_higher_version_to_satisfy_dep
+    t3 = util_spec "railties", "3.2"
+    t4 = util_spec "railties", "4.0"
 
-    assert_equal 1, cons.size
-    con = cons.first
+    r3 = util_spec "rails", "3.2", "railties" => "= 3.2"
+    r4 = util_spec "rails", "4.0", "railties" => "= 4.0"
 
-    assert_equal "c (= 1)", con.dependency.to_s
-    assert_equal "c-2", con.activated.full_name
+    rd = make_dep "rails", "3.2"
+
+    c3 = util_spec "coffee", "3.0", "railties" => "~> 3.0"
+    c4 = util_spec "coffee", "4.0", "railties" => "~> 4.0"
+
+    cd = make_dep "coffee"
+
+    s = set(t3, t4, r3, r4, c3, c4)
+
+    res = Gem::Resolver.new([rd, cd], s)
+
+    assert_resolves_to [r3, t3, c3], res
   end
 
   def test_raises_dependency_error

@@ -15,13 +15,33 @@ require 'net/http'
 class Gem::Resolver
 
   ##
+  # If the DEBUG_RESOLVER environment variable is set then debugging mode is
+  # enabled for the resolver.  This will display information about the state
+  # of the resolver while a set of dependencies is being resolved.
+
+  DEBUG_RESOLVER = !ENV['DEBUG_RESOLVER'].nil?
+
+  ##
   # Contains all the conflicts encountered while doing resolution
 
   attr_reader :conflicts
 
+  ##
+  # Set to true if development dependencies should be considered.
+
   attr_accessor :development
 
+  ##
+  # When true, no dependencies are looked up for requested gems.
+
+  attr_accessor :ignore_dependencies
+
+  ##
+  # List of dependencies that could not be found in the configured sources.
+
   attr_reader :missing
+
+  attr_reader :stats
 
   ##
   # When a missing dependency, don't stop. Just go on and record what was
@@ -29,8 +49,22 @@ class Gem::Resolver
 
   attr_accessor :soft_missing
 
+  ##
+  # Combines +sets+ into a ComposedSet that allows specification lookup in a
+  # uniform manner.  If one of the +sets+ is itself a ComposedSet its sets are
+  # flattened into the result ComposedSet.
+
   def self.compose_sets *sets
     sets.compact!
+
+    sets = sets.map do |set|
+      case set
+      when Gem::Resolver::ComposedSet then
+        set.sets
+      else
+        set
+      end
+    end.flatten
 
     case sets.length
     when 0 then
@@ -43,8 +77,8 @@ class Gem::Resolver
   end
 
   ##
-  # Provide a Resolver that queries only against the already
-  # installed gems.
+  # Creates a Resolver that queries only against the already installed gems
+  # for the +needed+ dependencies.
 
   def self.for_current_gems needed
     new needed, Gem::Resolver::CurrentSet.new
@@ -62,18 +96,27 @@ class Gem::Resolver
     @set = set || Gem::Resolver::IndexSet.new
     @needed = needed
 
-    @conflicts    = []
-    @development  = false
-    @missing      = []
-    @soft_missing = false
+    @conflicts           = []
+    @development         = false
+    @ignore_dependencies = false
+    @missing             = []
+    @soft_missing        = false
+    @stats               = Gem::Resolver::Stats.new
   end
 
-  DEBUG_RESOLVER = !ENV['DEBUG_RESOLVER'].nil?
-
-  def explain(stage, *data)
+  def explain stage, *data # :nodoc:
     if DEBUG_RESOLVER
       d = data.map { |x| x.inspect }.join(", ")
       STDOUT.printf "%20s %s\n", stage.to_s.upcase, d
+    end
+  end
+
+  def explain_list stage, data # :nodoc:
+    if DEBUG_RESOLVER
+      STDOUT.printf "%20s (%d entries)\n", stage.to_s.upcase, data.size
+      data.each do |d|
+        STDOUT.printf "%20s %s\n", "", d
+      end
     end
   end
 
@@ -94,13 +137,18 @@ class Gem::Resolver
     return spec, activation_request
   end
 
-  def requests s, act, reqs=nil
+  def requests s, act, reqs=nil # :nodoc:
+    return reqs if @ignore_dependencies
+
     s.dependencies.reverse_each do |d|
       next if d.type == :development and not @development
       reqs.add Gem::Resolver::DependencyRequest.new(d, act)
+      @stats.requirement!
     end
 
     @set.prefetch reqs
+
+    @stats.record_requirements reqs
 
     reqs
   end
@@ -111,13 +159,16 @@ class Gem::Resolver
   def resolve
     @conflicts = []
 
-    needed = RequirementList.new
+    needed = Gem::Resolver::RequirementList.new
 
     @needed.reverse_each do |n|
       request = Gem::Resolver::DependencyRequest.new n, nil
 
       needed.add request
+      @stats.requirement!
     end
+
+    @stats.record_requirements needed
 
     res = resolve_for needed, nil
 
@@ -125,34 +176,6 @@ class Gem::Resolver
       res.kind_of? Gem::Resolver::Conflict
 
     res.to_a
-  end
-
-  ##
-  # Finds the State in +states+ that matches the +conflict+ so that we can try
-  # other possible sets.
-  #
-  # If no good candidate is found, the first state is tried.
-
-  def find_conflict_state conflict, states # :nodoc:
-    rejected = []
-
-    until states.empty? do
-      state = states.pop
-
-      explain :consider, state.dep, conflict.failed_dep
-
-      if conflict.for_spec? state.spec
-        state.conflicts << [state.spec, conflict]
-        return state
-      end
-
-      rejected << state
-    end
-
-    return rejected.shift
-  ensure
-    rejected = rejected.concat states
-    states.replace rejected
   end
 
   ##
@@ -166,20 +189,29 @@ class Gem::Resolver
     return matching_platform, all
   end
 
-  def handle_conflict(dep, existing)
+  def handle_conflict(dep, existing) # :nodoc:
     # There is a conflict! We return the conflict object which will be seen by
     # the caller and be handled at the right level.
 
     # If the existing activation indicates that there are other possibles for
     # it, then issue the conflict on the dependency for the activation itself.
-    # Otherwise, issue it on the requester's request itself.
-    if existing.others_possible? or existing.request.requester.nil? then
+    # Otherwise, if there was a requester, issue it on the requester's
+    # request itself.
+    # Finally, if the existing request has no requester (toplevel) unwind to
+    # it anyway.
+
+    if existing.others_possible?
       conflict =
         Gem::Resolver::Conflict.new dep, existing
-    else
+    elsif dep.requester
       depreq = dep.requester.request
       conflict =
         Gem::Resolver::Conflict.new depreq, existing, dep
+    elsif existing.request.requester.nil?
+      conflict =
+        Gem::Resolver::Conflict.new dep, existing
+    else
+      raise Gem::DependencyError, "Unable to figure out how to unwind conflict"
     end
 
     @conflicts << conflict unless @conflicts.include? conflict
@@ -227,13 +259,17 @@ class Gem::Resolver
   # +specs+ being a list to ActivationRequest, calculate a new list of
   # ActivationRequest objects.
 
-  def resolve_for needed, specs
+  def resolve_for needed, specs # :nodoc:
     # The State objects that are used to attempt the activation tree.
     states = []
 
     while !needed.empty?
+      @stats.iteration!
+
       dep = needed.remove
       explain :try, [dep, dep.requester ? dep.requester.request : :toplevel]
+      explain_list :next5, needed.next5
+      explain_list :specs, Array(specs).map { |x| x.full_name }.sort
 
       # If there is already a spec activated for the requested name...
       if specs && existing = specs.find { |s| dep.name == s.name }
@@ -241,11 +277,32 @@ class Gem::Resolver
         next if dep.matches_spec? existing
 
         conflict = handle_conflict dep, existing
-        explain :conflict, conflict.explain
 
-        state = find_conflict_state conflict, states
+        return conflict unless dep.requester
+
+        explain :conflict, dep, :existing, existing.full_name
+
+        depreq = dep.requester.request
+
+        state = nil
+        until states.empty?
+          x = states.pop
+
+          i = existing.request.requester
+          explain :consider, x.spec.full_name, [depreq.name, dep.name, i ? i.name : :top]
+
+          if x.spec.name == depreq.name or
+              x.spec.name == dep.name or
+              (i && (i.name == x.spec.name))
+            explain :found, x.spec.full_name
+            state = x
+            break
+          end
+        end
 
         return conflict unless state
+
+        @stats.backtracking!
 
         needed, specs = resolve_for_conflict needed, specs, state
 
@@ -284,7 +341,7 @@ class Gem::Resolver
     # Retry resolution with this spec and add it's dependencies
     spec, act = activation_request state.dep, state.possibles
 
-    needed = requests spec, act, state.needed
+    needed = requests spec, act, state.needed.dup
     specs = Gem::List.prepend state.specs, act
 
     return needed, specs
@@ -307,6 +364,8 @@ class Gem::Resolver
     # to current +needed+ and +specs+ so we can try another. This is code is
     # what makes conflict resolution possible.
     states << State.new(needed.dup, specs, dep, spec, possible, [])
+
+    @stats.record_depth states
 
     explain :states, states.map { |s| s.dep }
 
@@ -366,6 +425,7 @@ require 'rubygems/resolver/activation_request'
 require 'rubygems/resolver/conflict'
 require 'rubygems/resolver/dependency_request'
 require 'rubygems/resolver/requirement_list'
+require 'rubygems/resolver/stats'
 
 require 'rubygems/resolver/set'
 require 'rubygems/resolver/api_set'
@@ -384,5 +444,7 @@ require 'rubygems/resolver/api_specification'
 require 'rubygems/resolver/git_specification'
 require 'rubygems/resolver/index_specification'
 require 'rubygems/resolver/installed_specification'
+require 'rubygems/resolver/local_specification'
+require 'rubygems/resolver/lock_specification'
 require 'rubygems/resolver/vendor_specification'
 

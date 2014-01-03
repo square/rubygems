@@ -24,16 +24,19 @@ unless Gem::Dependency.new('rdoc', '>= 3.10').matching_specs.empty?
   gem 'json'
 end
 
-require 'rubygems/deprecate'
 require 'minitest/autorun'
+
+require 'rubygems/deprecate'
+
 require 'fileutils'
+require 'pathname'
+require 'pp'
+require 'rubygems/package'
+require 'shellwords'
 require 'tmpdir'
 require 'uri'
-require 'rubygems/package'
-require 'pp'
 require 'zlib'
-require 'pathname'
-require 'shellwords'
+
 Gem.load_yaml
 
 require 'rubygems/mock_gem_ui'
@@ -84,6 +87,10 @@ end
 class Gem::TestCase < MiniTest::Unit::TestCase
 
   attr_accessor :fetcher # :nodoc:
+
+  attr_accessor :gem_repo # :nodoc:
+
+  attr_accessor :uri # :nodoc:
 
   def assert_activate expected, *specs
     specs.each do |spec|
@@ -1149,8 +1156,10 @@ Also, a list:
   def dependency_request dep, from_name, from_version, parent = nil
     remote = Gem::Source.new @uri
 
-    parent ||= Gem::Resolver::DependencyRequest.new \
-      dep, nil
+    unless parent then
+      parent_dep = dep from_name, from_version
+      parent = Gem::Resolver::DependencyRequest.new parent_dep, nil
+    end
 
     spec = Gem::Resolver::IndexSpecification.new \
       nil, from_name, from_version, remote, Gem::Platform::RUBY
@@ -1194,8 +1203,8 @@ Also, a list:
   #     end
   #   end
 
-  def spec_fetcher
-    Gem::TestCase::SpecFetcherSetup.declare self do |spec_fetcher_setup|
+  def spec_fetcher repository = @gem_repo
+    Gem::TestCase::SpecFetcherSetup.declare self, repository do |spec_fetcher_setup|
       yield spec_fetcher_setup if block_given?
     end
   end

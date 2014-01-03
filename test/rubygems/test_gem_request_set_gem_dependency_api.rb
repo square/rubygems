@@ -272,10 +272,12 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
 
   def test_gem_require
     @gda.gem 'a', :require => %w[b c]
+    @gda.gem 'd', :require => 'e'
 
-    assert_equal [dep('a')], @set.dependencies
+    assert_equal [dep('a'), dep('d')], @set.dependencies
 
     assert_equal %w[b c], @gda.requires['a']
+    assert_equal %w[e],   @gda.requires['d']
   end
 
   def test_gem_require_false
@@ -510,6 +512,27 @@ end
 
   def test_name_typo
     assert_same @GDA, Gem::RequestSet::GemDepedencyAPI
+  end
+
+  def test_pin_gem_source
+    gda = @GDA.new @set, nil
+
+    gda.send :pin_gem_source, 'a'
+    gda.send :pin_gem_source, 'a'
+
+    e = assert_raises ArgumentError do
+      gda.send :pin_gem_source, 'a', :path, 'vendor/a'
+    end
+
+    assert_equal "duplicate source path: vendor/a for gem a",
+                 e.message
+
+    e = assert_raises ArgumentError do
+      gda.send :pin_gem_source, 'a', :git, 'git://example/repo.git'
+    end
+
+    assert_equal "duplicate source git: git://example/repo.git for gem a",
+                 e.message
   end
 
   def test_platform_mswin

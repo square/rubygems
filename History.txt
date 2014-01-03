@@ -1,6 +1,47 @@
 # coding: UTF-8
 
-=== 2.2
+=== 2.2.1
+
+Bug fixes:
+
+* Platforms in the Gemfile.lock GEM section are now handled correctly.  Bug
+  #767 by Diego Viola.
+* RubyGems now displays which gem couldn't be uninstalled from the home
+  directory.  Pull request #757 by Michal Papis.
+* Removed unused method Gem::Resolver#find_conflict_state.  Pull request #759
+  by Smit Shah.
+* Fixed installing gems from local files without dependencies.  Issue #760 by
+  Arash Mousavi, pull request #764 by Tim Moore.
+* Removed TODO about syntax that works in Ruby 1.8.7.  Pull request #765 by
+  Benjamin Fleischer.
+
+=== 2.2.0 / 2013-12-26
+
+Special thanks to Vít Ondruch and Michal Papis for testing and finding bugs in
+RubyGems as it was prepared for the 2.2.0 release.
+
+Major enhancements:
+
+* RubyGems can check for gem dependencies files (gem.deps.rb or Gemfile) when
+  rubygems executables are started and uses the found dependencies.  This
+  means `rake` will work similar to `bundle exec rake`.  To enable this set
+  the `RUBYGEMS_GEMDEPS` environment variable to the location of your
+  dependencies file.
+
+  See Gem::use_gemdeps for further details.
+
+* A RubyGems directory may now be shared amongst multiple ruby versions.  Upon
+  activation RubyGems will automatically compile missing extensions for the
+  current platform when the built objects are missing.  Issue #596 by Michal
+  Papis
+
+  By default different platforms do not share gem install locations so this
+  must be configured by setting GEM_HOME to a common directory.  Some gems use
+  fixed paths for requiring extensions and are not compatible with sharing gem
+  directories.
+
+  The default sharing location may be configured by RubyGems packagers through
+  Gem.default_ext_dir_for.  Pull Request #744 by Vít Ondruch.
 
 Minor enhancements:
 
@@ -30,10 +71,6 @@ Minor enhancements:
   Gem::Ext::BuildError.  The old constant is an alias for the new constant.
 * When extensions are built the gem_make.out file is always written now, even
   on success.  This will help with debugging bad builds that report success.
-* A RubyGems directory may now be shared amongst multiple ruby versions.  Upon
-  activation RubyGems will automatically compile missing extensions for the
-  current platform when the built objects are missing.  Issue #596 by Michal
-  Papis
 * If a specification fails to validate RubyGems shows a link to the
   specification reference guide.  Issue #656 by Markus Heiler.
 * When using `gem install -g`, RubyGems now detects the presence of an
@@ -46,11 +83,29 @@ Minor enhancements:
 * RubyGems now warns when a gem has an open-ended dependency.
 * RubyGems now raises an exception when a dependency for a gem is defined
   twice.
+* Marked the license specification attribute as recommended.  Pull request
+  #713 by Benjamin Fleischer.
+* RubyGems uses io/console instead of `stty` when available.  Pull request
+  #740 by Nobuyoshi Nakada
+* Relaxed Gem.ruby tests for platforms that override where ruby lives.  Pull
+  Request #755 by strzibny.
 
 Bug fixes:
 
 * RubyGems now returns an error status when any file given to `gem which`
   cannot be found.  Ruby bug #9004 by Eugene Vilensky.
+* Fixed command escaping when building rake extensions.  Pull request #721 by
+  Dmitry Ratnikov.
+* Fixed uninstallation of gems when GEM_HOME is a relative directory.  Issue
+  #708 by Ryan Davis.
+* Default gems are now ignored by Gem::Validator#alien.  Issue #717 by David
+  Bahar.
+* Fixed typos in RubyGems.  Pull requests #723, #725, #731 by Akira Matsuda,
+  pull request #736 by Leo Gallucci, pull request #746 by DV Suresh.
+* RubyGems now holds exclusive locks on cached gem files to prevent incorrect
+  updates.  Pull Request #737 by Smit Shah
+* Improved speed of `gem install --ignore-dependencies`.  Patch by Terence
+  Lee.
 
 === 2.1.11 / 2013-11-12
 
@@ -815,6 +870,14 @@ $SAFE=1.  There is no functional difference compared to Ruby 2.0.0.preview2
   * The bindir is now created with mkdir_p during install. (voxik)
   * URI scheme matching is no longer case-sensitive.  Fixes #322
   * ext/builder now checks $MAKE as well as $make (okkez)
+
+=== 1.8.29 / 2013-11-23
+
+Bug fixes:
+
+* Fixed installation when the LANG environment variable is empty.
+* Added DigiCert High Assurance EV Root CA to the default SSL certificates for
+  cloudfront.
 
 === 1.8.28 / 2013-10-08
 

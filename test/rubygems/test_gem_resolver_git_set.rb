@@ -36,13 +36,31 @@ class TestGemResolverGitSet < Gem::TestCase
     assert @set.need_submodules[repository]
   end
 
+  def test_add_git_spec
+    name, version, repository, revision = git_gem
+
+    @set.add_git_spec name, version, repository, revision, true
+
+    dependency = dep 'a'
+
+    specs = @set.find_all dependency
+
+    spec = specs.first
+
+    assert_equal "#{name}-#{version}", spec.full_name
+
+    assert @set.need_submodules[repository]
+
+    refute_path_exists spec.source.repo_cache_dir
+  end
+
   def test_find_all
     name, _, repository, = git_gem
 
     @set.add_git_gem name, repository, 'master', false
 
     dependency = dep 'a', '~> 1.0'
-    req = Gem::Resolver::ActivationRequest.new dependency, nil
+    req = Gem::Resolver::DependencyRequest.new dependency, nil
     @reqs.add req
 
     @set.prefetch @reqs
@@ -52,18 +70,44 @@ class TestGemResolverGitSet < Gem::TestCase
     assert_equal [@set.specs['a']], found
   end
 
+  def test_root_dir
+    assert_equal Gem.dir, @set.root_dir
+
+    @set.root_dir = "#{@gemhome}2"
+
+    assert_equal "#{@gemhome}2", @set.root_dir
+  end
+
   def test_prefetch
     name, _, repository, = git_gem
 
     @set.add_git_gem name, repository, 'master', false
 
     dependency = dep name
-    req = Gem::Resolver::ActivationRequest.new dependency, nil
+    req = Gem::Resolver::DependencyRequest.new dependency, nil
     @reqs.add req
 
     @set.prefetch @reqs
 
     refute_empty @set.specs
+  end
+
+  def test_prefetch_cache
+    name, _, repository, = git_gem
+
+    @set.add_git_gem name, repository, 'master', false
+
+    dependency = dep name
+    req = Gem::Resolver::DependencyRequest.new dependency, nil
+    @reqs.add req
+
+    @set.prefetch @reqs
+
+    spec = @set.specs[name]
+
+    @set.prefetch @reqs
+
+    assert_same spec, @set.specs[name]
   end
 
   def test_prefetch_filter
@@ -72,12 +116,32 @@ class TestGemResolverGitSet < Gem::TestCase
     @set.add_git_gem name, repository, 'master', false
 
     dependency = dep 'b'
-    req = Gem::Resolver::ActivationRequest.new dependency, nil
+    req = Gem::Resolver::DependencyRequest.new dependency, nil
     @reqs.add req
 
     @set.prefetch @reqs
 
-    assert_empty @set.specs
+    refute_empty @set.specs, 'the git source does not filter'
+  end
+
+  def test_prefetch_root_dir
+    name, _, repository, = git_gem
+
+    @set.add_git_gem name, repository, 'master', false
+
+    dependency = dep name
+    req = Gem::Resolver::DependencyRequest.new dependency, nil
+    @reqs.add req
+
+    @set.root_dir = "#{@gemhome}2"
+
+    @set.prefetch @reqs
+
+    refute_empty @set.specs
+
+    spec = @set.specs.values.first
+
+    assert_equal "#{@gemhome}2", spec.source.root_dir
   end
 
 end

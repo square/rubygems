@@ -9,9 +9,7 @@ require 'rubygems/util'
 #   source =
 #     Gem::Source::Git.new 'rake', 'git@example:rake.git', 'rake-10.1.0', false
 #
-#   spec = source.load_spec 'rake'
-#
-#   source.checkout
+#   source.specs
 
 class Gem::Source::Git < Gem::Source
 
@@ -31,14 +29,21 @@ class Gem::Source::Git < Gem::Source
   attr_reader :repository
 
   ##
+  # The directory for cache and git gem installation
+
+  attr_accessor :root_dir
+
+  ##
   # Does this repository need submodules checked out too?
 
   attr_reader :need_submodules
 
   ##
-  # Creates a new git gem source for a gem with the given +name+ that will be
-  # loaded from +reference+ in +repository+.  If +submodules+ is true,
-  # submodules will be checked out when the gem is installed.
+  # Creates a new git gem source for a gems from loaded from +repository+ at
+  # the given +reference+.  The +name+ is only used to track the repository
+  # back to a gem dependencies file, it has no real significance as a git
+  # repository may contain multiple gems.  If +submodules+ is true, submodules
+  # will be checked out when the gem is installed.
 
   def initialize name, repository, reference, submodules = false
     super(nil)
@@ -48,14 +53,16 @@ class Gem::Source::Git < Gem::Source
     @reference       = reference
     @need_submodules = submodules
 
-    @git = ENV['git'] || 'git'
+    @root_dir = Gem.dir
+    @git      = ENV['git'] || 'git'
   end
 
   def <=> other
     case other
     when Gem::Source::Git then
       0
-    when Gem::Source::Installed then
+    when Gem::Source::Installed,
+         Gem::Source::Lock then
       -1
     when Gem::Source then
       1
@@ -89,7 +96,7 @@ class Gem::Source::Git < Gem::Source
       success = system @git, 'reset', '--quiet', '--hard', @reference
 
       success &&=
-        system @git, 'submodule', 'update',
+        Gem::Util.silent_system @git, 'submodule', 'update',
                '--quiet', '--init', '--recursive' if @need_submodules
 
       success
@@ -112,6 +119,13 @@ class Gem::Source::Git < Gem::Source
   end
 
   ##
+  # Directory where git gems get unpacked and so-forth.
+
+  def base_dir # :nodoc:
+    File.join @root_dir, 'bundler'
+  end
+
+  ##
   # A short reference for use in git gem directories
 
   def dir_shortref # :nodoc:
@@ -119,37 +133,25 @@ class Gem::Source::Git < Gem::Source
   end
 
   ##
-  # The directory where the git gem will be installed.
+  # Nothing to download for git gems
 
-  def install_dir # :nodoc:
-    File.join Gem.dir, 'bundler', 'gems', "#{@name}-#{dir_shortref}"
+  def download full_spec, path # :nodoc:
   end
 
   ##
-  # Loads a Gem::Specification for +name+ from this git repository.
+  # The directory where the git gem will be installed.
 
-  def load_spec name
-    cache
+  def install_dir # :nodoc:
+    File.join base_dir, 'gems', "#{@name}-#{dir_shortref}"
+  end
 
-    gemspec_reference = "#{@reference}:#{name}.gemspec"
+  def pretty_print q # :nodoc:
+    q.group 2, '[Git: ', ']' do
+      q.breakable
+      q.text @repository
 
-    Dir.chdir repo_cache_dir do
-      source = Gem::Util.popen @git, 'show', gemspec_reference
-
-      source.force_encoding Encoding::UTF_8 if Object.const_defined? :Encoding
-      source.untaint
-
-      begin
-        spec = eval source, binding, gemspec_reference
-
-        return spec if Gem::Specification === spec
-
-        warn "git gem specification for #{@repository} #{gemspec_reference} is not a Gem::Specification (#{spec.class} instead)."
-      rescue SignalException, SystemExit
-        raise
-      rescue SyntaxError, Exception
-        warn "invalid git gem specification for #{@repository} #{gemspec_reference}"
-      end
+      q.breakable
+      q.text @reference
     end
   end
 
@@ -157,16 +159,43 @@ class Gem::Source::Git < Gem::Source
   # The directory where the git gem's repository will be cached.
 
   def repo_cache_dir # :nodoc:
-    File.join Gem.dir, 'cache', 'bundler', 'git', "#{@name}-#{uri_hash}"
+    File.join @root_dir, 'cache', 'bundler', 'git', "#{@name}-#{uri_hash}"
   end
 
   ##
   # Converts the git reference for the repository into a commit hash.
 
   def rev_parse # :nodoc:
-    # HACK no safe equivalent of ` exists on 1.8.7
     Dir.chdir repo_cache_dir do
       Gem::Util.popen(@git, 'rev-parse', @reference).strip
+    end
+  end
+
+  ##
+  # Loads all gemspecs in the repository
+
+  def specs
+    checkout
+
+    Dir.chdir install_dir do
+      Dir['{,*,*/*}.gemspec'].map do |spec_file|
+        directory = File.dirname spec_file
+        file      = File.basename spec_file
+
+        Dir.chdir directory do
+          spec = Gem::Specification.load file
+          if spec then
+            spec.base_dir = base_dir
+
+            spec.extension_dir =
+              File.join base_dir, 'extensions', Gem::Platform.local.to_s,
+                Gem.extension_api_version, "#{name}-#{dir_shortref}"
+
+            spec.full_gem_path = File.dirname spec.loaded_from if spec
+          end
+          spec
+        end
+      end.compact
     end
   end
 

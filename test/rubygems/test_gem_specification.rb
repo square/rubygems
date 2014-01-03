@@ -716,6 +716,20 @@ dependencies: []
     assert_equal @a2, spec
   end
 
+  def test_self_load_relative
+    open 'a-2.gemspec', 'w' do |io|
+      io.write @a2.to_ruby_for_cache
+    end
+
+    spec = Gem::Specification.load 'a-2.gemspec'
+
+    @a2.files.clear
+
+    assert_equal @a2, spec
+
+    assert_equal File.join(@tempdir, 'a-2.gemspec'), spec.loaded_from
+  end
+
   def test_self_load_tainted
     full_path = @a2.spec_file
     write_file full_path do |io|
@@ -985,8 +999,8 @@ dependencies: []
     assert_equal 'summary', spec.summary
     assert_same spec.summary, new_spec.summary
 
-    assert_equal %w[lib/file.rb test/file.rb bin/exec README.txt
-                    ext/extconf.rb].sort,
+    assert_equal %w[README.txt bin/exec ext/extconf.rb lib/file.rb
+                    test/file.rb].sort,
                  spec.files
     refute_same spec.files, new_spec.files, 'files'
 
@@ -1095,13 +1109,37 @@ dependencies: []
     @a2.executable = 'app'
 
     assert_equal nil, @a2.bindir
-    assert_equal %w[lib/code.rb app].sort, @a2.files
+    assert_equal %w[app lib/code.rb].sort, @a2.files
+  end
+
+  def test_extensions_equals_nil
+    @a2.instance_variable_set(:@extensions, nil)
+    assert_equal nil, @a2.instance_variable_get(:@extensions)
+    assert_equal %w[lib/code.rb], @a2.files
+  end
+
+  def test_test_files_equals_nil
+    @a2.instance_variable_set(:@test_files, nil)
+    assert_equal nil, @a2.instance_variable_get(:@test_files)
+    assert_equal %w[lib/code.rb], @a2.files
+  end
+
+  def test_executables_equals_nil
+    @a2.instance_variable_set(:@executables, nil)
+    assert_equal nil, @a2.instance_variable_get(:@executables)
+    assert_equal %w[lib/code.rb], @a2.files
+  end
+
+  def test_extra_rdoc_files_equals_nil
+    @a2.instance_variable_set(:@extra_rdoc_files, nil)
+    assert_equal nil, @a2.instance_variable_get(:@extra_rdoc_files)
+    assert_equal %w[lib/code.rb], @a2.files
   end
 
   def test_build_extensions
     ext_spec
 
-    refute_path_exists @ext.extension_install_dir, 'sanity check'
+    refute_path_exists @ext.extension_dir, 'sanity check'
     refute_empty @ext.extensions, 'sanity check'
 
     extconf_rb = File.join @ext.gem_dir, @ext.extensions.first
@@ -1119,7 +1157,7 @@ dependencies: []
 
     @ext.build_extensions
 
-    assert_path_exists @ext.extension_install_dir
+    assert_path_exists @ext.extension_dir
   end
 
   def test_build_extensions_built
@@ -1128,14 +1166,14 @@ dependencies: []
     refute_empty @ext.extensions, 'sanity check'
 
     gem_build_complete =
-      File.join @ext.extension_install_dir, 'gem.build_complete'
+      File.join @ext.extension_dir, 'gem.build_complete'
 
-    FileUtils.mkdir_p @ext.extension_install_dir
+    FileUtils.mkdir_p @ext.extension_dir
     FileUtils.touch gem_build_complete
 
     @ext.build_extensions
 
-    gem_make_out = File.join @ext.extension_install_dir, 'gem_make.out'
+    gem_make_out = File.join @ext.extension_dir, 'gem_make.out'
     refute_path_exists gem_make_out
   end
 
@@ -1157,7 +1195,7 @@ dependencies: []
 
     spec.build_extensions
 
-    refute_path_exists spec.extension_install_dir
+    refute_path_exists spec.extension_dir
   end
 
   def test_build_extensions_error
@@ -1229,19 +1267,19 @@ dependencies: []
 
     @ext.build_extensions
 
-    gem_make_out = File.join @ext.extension_install_dir, 'gem_make.out'
+    gem_make_out = File.join @ext.extension_dir, 'gem_make.out'
     refute_path_exists gem_make_out
   ensure
     FileUtils.chmod 0755, @gemhome
   end
 
   def test_build_extensions_none
-    refute_path_exists @a1.extension_install_dir, 'sanity check'
+    refute_path_exists @a1.extension_dir, 'sanity check'
     assert_empty @a1.extensions, 'sanity check'
 
     @a1.build_extensions
 
-    refute_path_exists @a1.extension_install_dir
+    refute_path_exists @a1.extension_dir
   end
 
   def test_build_extensions_old
@@ -1253,7 +1291,7 @@ dependencies: []
 
     @ext.build_extensions
 
-    gem_make_out = File.join @ext.extension_install_dir, 'gem_make.out'
+    gem_make_out = File.join @ext.extension_dir, 'gem_make.out'
     refute_path_exists gem_make_out
   end
 
@@ -1279,7 +1317,7 @@ dependencies: []
 
     @ext.build_extensions
 
-    gem_make_out = File.join @ext.extension_install_dir, 'gem_make.out'
+    gem_make_out = File.join @ext.extension_dir, 'gem_make.out'
     assert_path_exists gem_make_out
   end
 
@@ -1309,7 +1347,7 @@ dependencies: []
 
     refute @ext.contains_requirable_file? 'nonexistent'
 
-    assert_path_exists @ext.extension_install_dir
+    assert_path_exists @ext.extension_dir
   end
 
   def test_date
@@ -1423,14 +1461,14 @@ dependencies: []
   def test_executable_equals
     @a2.executable = 'app'
     assert_equal 'app', @a2.executable
-    assert_equal %w[lib/code.rb bin/app].sort, @a2.files
+    assert_equal %w[bin/app lib/code.rb].sort, @a2.files
   end
 
   def test_extensions
     assert_equal ['ext/extconf.rb'], ext_spec.extensions
   end
 
-  def test_extension_install_dir
+  def test_extension_dir
     enable_shared, RbConfig::CONFIG['ENABLE_SHARED'] =
       RbConfig::CONFIG['ENABLE_SHARED'], 'no'
 
@@ -1442,9 +1480,38 @@ dependencies: []
       File.join(@ext.base_dir, 'extensions', Gem::Platform.local.to_s,
                 "#{Gem.ruby_api_version}-static", @ext.full_name)
 
-    assert_equal expected, @ext.extension_install_dir
+    assert_equal expected, @ext.extension_dir
   ensure
     RbConfig::CONFIG['ENABLE_SHARED'] = enable_shared
+  end
+
+  def test_extension_dir_override
+    enable_shared, RbConfig::CONFIG['ENABLE_SHARED'] =
+      RbConfig::CONFIG['ENABLE_SHARED'], 'no'
+
+    class << Gem
+      alias orig_default_ext_dir_for default_ext_dir_for
+
+      def Gem.default_ext_dir_for(base_dir)
+        'elsewhere'
+      end
+    end
+
+    ext_spec
+
+    refute_empty @ext.extensions
+
+    expected = File.join @tempdir, 'elsewhere', @ext.full_name
+
+    assert_equal expected, @ext.extension_dir
+  ensure
+    RbConfig::CONFIG['ENABLE_SHARED'] = enable_shared
+
+    class << Gem
+      remove_method :default_ext_dir_for
+
+      alias default_ext_dir_for orig_default_ext_dir_for
+    end
   end
 
   def test_files
@@ -1596,7 +1663,7 @@ dependencies: []
   end
 
   def test_gem_build_complete_path
-    expected = File.join @a1.extension_install_dir, 'gem.build_complete'
+    expected = File.join @a1.extension_dir, 'gem.build_complete'
     assert_equal expected, @a1.gem_build_complete_path
   end
 
@@ -1729,7 +1796,7 @@ dependencies: []
 
     @ext.require_path = 'lib'
 
-    ext_install_dir = Pathname(@ext.extension_install_dir)
+    ext_install_dir = Pathname(@ext.extension_dir)
     full_gem_path = Pathname(@ext.full_gem_path)
     relative_install_dir = ext_install_dir.relative_path_from full_gem_path
 
@@ -1738,13 +1805,17 @@ dependencies: []
     RbConfig::CONFIG['ENABLE_SHARED'] = enable_shared
   end
 
+  def test_source
+    assert_kind_of Gem::Source::Installed, @a1.source
+  end
+
   def test_full_require_paths
     ext_spec
 
     @ext.require_path = 'lib'
 
     expected = [
-      @ext.extension_install_dir,
+      @ext.extension_dir,
       File.join(@gemhome, 'gems', @ext.original_name, 'lib'),
     ]
 
@@ -2388,7 +2459,7 @@ duplicate dependency on b (>= 1.2.3), (~> 1.2) use:
       assert_equal '["lib2"] are not files', e.message
     end
 
-    assert_equal %w[lib/code.rb test/suite.rb bin/exec ext/a/extconf.rb lib2].sort,
+    assert_equal %w[bin/exec ext/a/extconf.rb lib/code.rb lib2 test/suite.rb].sort,
                  @a1.files
   end
 
@@ -2447,8 +2518,8 @@ duplicate dependency on b (>= 1.2.3), (~> 1.2) use:
     end
 
     assert_match <<-warning, @ui.error
-WARNING:  licenses is empty.  Use a license abbreviation from:
-  http://opensource.org/licenses/alphabetical
+WARNING:  licenses is empty, but is recommended.  Use a license abbreviation from:
+http://opensource.org/licenses/alphabetical
     warning
   end
 

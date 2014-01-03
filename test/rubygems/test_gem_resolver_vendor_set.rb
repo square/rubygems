@@ -16,6 +16,8 @@ class TestGemResolverVendorSet < Gem::TestCase
     spec = @set.load_spec name, version, Gem::Platform::RUBY, nil
 
     assert_equal "#{name}-#{version}", spec.full_name
+
+    assert_equal File.expand_path(directory), spec.full_gem_path
   end
 
   def test_add_vendor_gem_missing
@@ -57,7 +59,7 @@ class TestGemResolverVendorSet < Gem::TestCase
     error = Object.const_defined?(:KeyError) ? KeyError : IndexError
 
     assert_raises error do
-      @set.load_spec 'a', v(1), Gem::Platform::RUBY, nil
+      @set.load_spec 'b', v(1), Gem::Platform::RUBY, nil
     end
   end
 

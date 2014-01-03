@@ -13,6 +13,14 @@ class TestGemSourceGit < Gem::TestCase
     @source = Gem::Source::Git.new @name, @repository, 'master', false
   end
 
+  def test_base_dir
+    assert_equal File.join(Gem.dir, 'bundler'), @source.base_dir
+
+    @source.root_dir = "#{@gemhome}2"
+
+    assert_equal File.join("#{@gemhome}2", 'bundler'), @source.base_dir
+  end
+
   def test_checkout
     @source.checkout
 
@@ -25,7 +33,8 @@ class TestGemSourceGit < Gem::TestCase
     git_gem 'b'
 
     Dir.chdir 'git/a' do
-      system @git, 'submodule', '--quiet', 'add', File.expand_path('../b'), 'b'
+      Gem::Util.silent_system @git, 'submodule', '--quiet',
+                              'add', File.expand_path('../b'), 'b'
       system @git, 'commit', '--quiet', '-m', 'add submodule b'
     end
 
@@ -49,6 +58,10 @@ class TestGemSourceGit < Gem::TestCase
     @source.cache
 
     assert_equal @head[0..11], @source.dir_shortref
+  end
+
+  def test_download
+    refute @source.download nil, nil
   end
 
   def test_equals2
@@ -78,12 +91,6 @@ class TestGemSourceGit < Gem::TestCase
     refute_equal @source, source
   end
 
-  def test_load_spec
-    spec = @source.load_spec @name
-
-    assert_equal "#{@name}-#{@version}", spec.full_name
-  end
-
   def test_install_dir
     @source.cache
 
@@ -95,6 +102,13 @@ class TestGemSourceGit < Gem::TestCase
   def test_repo_cache_dir
     expected =
       File.join Gem.dir, 'cache', 'bundler', 'git', "a-#{@hash}"
+
+    assert_equal expected, @source.repo_cache_dir
+
+    @source.root_dir = "#{@gemhome}2"
+
+    expected =
+      File.join "#{@gemhome}2", 'cache', 'bundler', 'git', "a-#{@hash}"
 
     assert_equal expected, @source.repo_cache_dir
   end
@@ -119,6 +133,14 @@ class TestGemSourceGit < Gem::TestCase
     refute_equal master_head, source.rev_parse
   end
 
+  def test_root_dir
+    assert_equal Gem.dir, @source.root_dir
+
+    @source.root_dir = "#{@gemhome}2"
+
+    assert_equal "#{@gemhome}2", @source.root_dir
+  end
+
   def test_spaceship
     git       = Gem::Source::Git.new 'a', 'git/a', 'master', false
     remote    = Gem::Source.new @gem_repo
@@ -131,6 +153,62 @@ class TestGemSourceGit < Gem::TestCase
 
     assert_equal( 1, installed.<=>(git),       'installed <=> git')
     assert_equal(-1, git.      <=>(installed), 'git       <=> installed')
+  end
+
+  def test_specs
+    source = Gem::Source::Git.new @name, @repository, 'master', true
+
+    Dir.chdir 'git/a' do
+      FileUtils.mkdir 'b'
+
+      Dir.chdir 'b' do
+        b = Gem::Specification.new 'b', 1
+
+        open 'b.gemspec', 'w' do |io|
+          io.write b.to_ruby
+        end
+
+        system @git, 'add', 'b.gemspec'
+        system @git, 'commit', '--quiet', '-m', 'add b/b.gemspec'
+      end
+
+      FileUtils.touch 'c.gemspec'
+
+      system @git, 'add', 'c.gemspec'
+      system @git, 'commit', '--quiet', '-m', 'add c.gemspec'
+    end
+
+    specs = nil
+
+    capture_io do
+      specs = source.specs
+    end
+
+    assert_equal %w[a-1 b-1], specs.map { |spec| spec.full_name }
+
+    a_spec = specs.shift
+
+    base_dir = File.dirname File.dirname source.install_dir
+
+    assert_equal source.install_dir, a_spec.full_gem_path
+    assert_equal File.join(source.install_dir, 'a.gemspec'), a_spec.loaded_from
+    assert_equal base_dir, a_spec.base_dir
+
+    extension_dir =
+      File.join Gem.dir, 'bundler', 'extensions',
+        Gem::Platform.local.to_s, Gem.extension_api_version,
+        "a-#{source.dir_shortref}"
+
+    assert_equal extension_dir, a_spec.extension_dir
+
+    b_spec = specs.shift
+
+    assert_equal File.join(source.install_dir, 'b'), b_spec.full_gem_path
+    assert_equal File.join(source.install_dir, 'b', 'b.gemspec'),
+                 b_spec.loaded_from
+    assert_equal base_dir, b_spec.base_dir
+
+    assert_equal extension_dir, b_spec.extension_dir
   end
 
   def test_uri_hash

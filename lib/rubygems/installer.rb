@@ -57,6 +57,11 @@ class Gem::Installer
 
   attr_reader :options
 
+  ##
+  # Sets the specification for .gem-less installs.
+
+  attr_writer :spec
+
   @path_warning = false
 
   class << self
@@ -206,6 +211,8 @@ class Gem::Installer
 
   def install
     pre_install_checks
+
+    FileUtils.rm_f File.join gem_home, 'specifications', @spec.spec_name
 
     run_pre_install_hooks
 

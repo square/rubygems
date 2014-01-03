@@ -5,9 +5,24 @@
 class Gem::BasicSpecification
 
   ##
+  # Allows installation of extensions for git: gems.
+
+  attr_writer :base_dir # :nodoc:
+
+  ##
+  # Sets the directory where extensions for this gem will be installed.
+
+  attr_writer :extension_dir # :nodoc:
+
+  ##
   # The path this gemspec was loaded from.  This attribute is not persisted.
 
   attr_reader :loaded_from
+
+  ##
+  # Allows correct activation of git: and path: gems.
+
+  attr_writer :full_gem_path # :nodoc:
 
   def self.default_specifications_dir
     File.join(Gem.default_dir, "specifications", "default")
@@ -54,17 +69,19 @@ class Gem::BasicSpecification
   end
 
   ##
-  # The directory the named +extension+ was installed into after being built.
-  #
-  # Usage:
-  #
-  #   spec.extensions.each do |ext|
-  #     puts spec.extension_install_dir ext
-  #   end
+  # Returns full path to the directory where gem's extensions are installed.
 
-  def extension_install_dir
-    File.join base_dir, 'extensions', Gem::Platform.local.to_s,
-              Gem.extension_api_version, full_name
+  def extension_dir
+    @extension_dir ||= File.expand_path File.join(extensions_dir, full_name)
+  end
+
+  ##
+  # Returns path to the extensions directory.
+
+  def extensions_dir
+    @extensions_dir ||= Gem.default_ext_dir_for(base_dir) ||
+      File.join(base_dir, 'extensions', Gem::Platform.local.to_s,
+                Gem.extension_api_version)
   end
 
   def find_full_gem_path # :nodoc:
@@ -107,7 +124,7 @@ class Gem::BasicSpecification
       File.join full_gem_path, path
     end
 
-    full_paths.unshift extension_install_dir unless @extensions.empty?
+    full_paths.unshift extension_dir unless @extensions.empty?
 
     full_paths
   end
@@ -136,9 +153,12 @@ class Gem::BasicSpecification
   def loaded_from= path
     @loaded_from   = path && path.to_s
 
-    @full_gem_path = nil
-    @gems_dir      = nil
-    @base_dir      = nil
+    @extension_dir = nil
+    @extensions_dir = nil
+    @full_gem_path         = nil
+    @gem_dir               = nil
+    @gems_dir              = nil
+    @base_dir              = nil
   end
 
   ##
@@ -179,11 +199,11 @@ class Gem::BasicSpecification
   def require_paths
     return @require_paths if @extensions.empty?
 
-    relative_extension_install_dir =
+    relative_extension_dir =
       File.join '..', '..', 'extensions', Gem::Platform.local.to_s,
                 Gem.extension_api_version, full_name
 
-    [relative_extension_install_dir].concat @require_paths
+    [relative_extension_dir].concat @require_paths
   end
 
   ##
