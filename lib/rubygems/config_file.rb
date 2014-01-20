@@ -42,6 +42,7 @@ class Gem::ConfigFile
   DEFAULT_BULK_THRESHOLD = 1000
   DEFAULT_VERBOSITY = true
   DEFAULT_UPDATE_SOURCES = true
+  DEFAULT_TUF = false
 
   ##
   # For Ruby packagers to set configuration defaults.  Set in
@@ -190,6 +191,7 @@ class Gem::ConfigFile
     @bulk_threshold = DEFAULT_BULK_THRESHOLD
     @verbose = DEFAULT_VERBOSITY
     @update_sources = DEFAULT_UPDATE_SOURCES
+    @tuf = DEFAULT_TUF
 
     operating_system_config = Marshal.load Marshal.dump(OPERATING_SYSTEM_DEFAULTS)
     platform_config = Marshal.load Marshal.dump(PLATFORM_DEFAULTS)
