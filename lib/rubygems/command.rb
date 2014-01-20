@@ -537,6 +537,10 @@ class Gem::Command
                     'Turn on Ruby debugging') do
   end
 
+  add_common_option('--tuf',
+                    'Turn on TUF') do
+  end
+
   # :stopdoc:
 
   HELP = <<-HELP

@@ -50,7 +50,11 @@ class Gem::RemoteFetcher
   # Cached RemoteFetcher instance.
 
   def self.fetcher
-    @fetcher ||= Gem::TUF::Fetcher.new Gem.configuration[:http_proxy]
+    @fetcher ||= if Gem.configuration.tuf?
+                   Gem::TUF::Fetcher.new Gem.configuration[:http_proxy]
+                 else
+                   Gem::RemoteFetcher.new Gem.configuration[:http_proxy]
+                 end
   end
 
   ##

@@ -354,6 +354,11 @@ if you believe they were disclosed to a third party.
     @config_file_name || Gem.config_file
   end
 
+  # Whether or not TUF is enabled.
+  def tuf?
+    @tuf
+  end
+
   # Delegates to @hash
   def each(&block)
     hash = @hash.dup
@@ -380,6 +385,8 @@ if you believe they were disclosed to a third party.
       case arg
       when /^--(backtrace|traceback)$/ then
         @backtrace = true
+      when "--tuf"
+        @tuf = true
       when /^--debug$/ then
         $DEBUG = true
       else
