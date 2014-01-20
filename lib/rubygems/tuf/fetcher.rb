@@ -16,6 +16,7 @@ class HttpBucket
 
   def get(path, opts = {})
     # TODO: https, options
+    # TODO: Caching
     uri = @initial_uri.dup
     uri.path = '/' + path
     @fetcher.fetch_http(uri)
