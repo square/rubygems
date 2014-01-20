@@ -136,11 +136,13 @@ class Gem::CommandManager
   def run(args, build_args=nil)
     process_args(args, build_args)
   rescue StandardError, Timeout::Error => ex
+    raise
     alert_error "While executing gem ... (#{ex.class})\n    #{ex.to_s}"
     ui.backtrace ex
 
     terminate_interaction(1)
   rescue Interrupt
+    raise
     alert_error "Interrupted"
     terminate_interaction(1)
   end

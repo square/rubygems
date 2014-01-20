@@ -5,6 +5,7 @@
 # See LICENSE.txt for permissions.
 #++
 
+$LOAD_PATH.unshift(File.expand_path('../../lib', __FILE__))
 require 'rubygems'
 require 'rubygems/gem_runner'
 require 'rubygems/exceptions'

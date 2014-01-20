@@ -10,6 +10,9 @@ require 'resolv'
 
 class Gem::RemoteFetcher
 
+  # TODO: Justify this
+  require 'rubygems/tuf/fetcher'
+
   include Gem::UserInteraction
 
   ##
@@ -47,7 +50,7 @@ class Gem::RemoteFetcher
   # Cached RemoteFetcher instance.
 
   def self.fetcher
-    @fetcher ||= self.new Gem.configuration[:http_proxy]
+    @fetcher ||= Gem::TUF::Fetcher.new Gem.configuration[:http_proxy]
   end
 
   ##
