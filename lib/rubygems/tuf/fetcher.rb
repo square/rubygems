@@ -1,13 +1,16 @@
 require 'rubygems/tuf'
 
 # TODO: Move this code in here
-$LOAD_PATH.unshift(File.expand_path("~/Development/rubygems.org/app/models"))
+$LOAD_PATH.unshift(File.expand_path("~/Code/os/rubygems.org/app/models"))
 
 require 'tuf/repository'
 
 class HttpBucket
   def initialize(fetcher, initial_uri)
-    @fetcher = fetcher
+    @fetcher     = fetcher
+
+    # Used as the remote host, scheme and port for all future requests. This is
+    # kind of weird but I'm not sure a better way to pass it through.
     @initial_uri = initial_uri
   end
 
@@ -24,8 +27,6 @@ class HttpBucket
 end
 
 class Gem::TUF::Fetcher < Gem::RemoteFetcher
-  attr_reader :fetcher
-
   def initialize(proxy)
     super
   end
@@ -41,9 +42,20 @@ class Gem::TUF::Fetcher < Gem::RemoteFetcher
       bucket: HttpBucket.new(self, uri)
     )
 
-    file = repository.target(uri.path)
+    file = repository.target(uri.path[1..-1])
     if file
-      file.body
+      data = file.body
+
+      # TODO: DRY up with RemoteFetcher
+      if data and !head and uri.to_s =~ /gz$/
+        begin
+          data = Gem.gunzip data
+        rescue Zlib::GzipFile::Error
+          raise FetchError.new("server did not return a valid file", uri.to_s)
+        end
+      end
+
+      data
     else
       raise FetchError.new("server did not return a valid file", uri.to_s)
     end
