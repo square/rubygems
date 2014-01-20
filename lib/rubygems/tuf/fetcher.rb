@@ -1,9 +1,9 @@
 require 'rubygems/tuf'
 
 # TODO: Move this code in here
-$LOAD_PATH.unshift(File.expand_path("~/Code/os/rubygems.org/app/models"))
+# $LOAD_PATH.unshift(File.expand_path("~/Code/os/rubygems.org/app/models"))
 
-require 'tuf/repository'
+require 'rubygems/tuf/repository'
 
 class HttpBucket
   def initialize(fetcher, initial_uri)
@@ -38,7 +38,7 @@ class Gem::TUF::Fetcher < Gem::RemoteFetcher
     last_good_root = File.read('root.txt') ||
                      raise("Can't find root.txt")
 
-    repository = Tuf::Repository.new(
+    repository = Gem::TUF::Repository.new(
       root:   JSON.parse(last_good_root),
       bucket: HttpBucket.new(self, uri)
     )
