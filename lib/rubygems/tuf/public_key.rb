@@ -13,7 +13,7 @@ class Gem::TUF::PublicKey
   end
 
   def verify signature, data
-    @rsa_key.verify(Gem::TUF::DIGEST_ALGORITHM.new, signature, data)
+    @rsa_key.verify(digest, signature, data)
   end
 
   def as_json
@@ -31,5 +31,9 @@ class Gem::TUF::PublicKey
   def generate_keyid
     canonical_json = CanonicalJSON.dump as_json
     @keyid = Digest::SHA256.hexdigest canonical_json
+  end
+
+  def digest
+    @digest ||= OpenSSL::Digest.new(Gem::TUF::DIGEST_NAME)
   end
 end

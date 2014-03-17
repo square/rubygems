@@ -10,15 +10,19 @@ class Gem::TUF::Release
   end
 
   def should_update_root? current_root_txt
-    @release["meta"]["root.txt"]["hashes"].each do |type, expected_digest|
-      current_digest = case type
-                       when "sha512"
-                         Digest::SHA512.hexdigest(current_root_txt)
-                       else
-                         raise UnsupportedDigest
-                       end
-      return true unless current_digest == expected_digest
+    @release["meta"]["root.txt"]["hashes"].any? do |type, expected_digest|
+      expected_digest != current_digest(type, current_root_txt)
     end
-    false
+  end
+
+  protected
+
+  def current_digest(type, current_root_txt)
+    case type
+    when Gem::TUF::DIGEST_NAME
+     Gem::TUF::DIGEST_ALGORITHM.hexdigest(current_root_txt)
+    else
+     raise UnsupportedDigest
+    end
   end
 end

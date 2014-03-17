@@ -1,19 +1,15 @@
+require 'digest/sha2'
+
 module Gem::TUF
   ##
   # Digest algorithm used to sign gems
 
-  DIGEST_ALGORITHM =
-    if defined?(OpenSSL::Digest) then
-      OpenSSL::Digest::SHA512
-    end
+  DIGEST_ALGORITHM = Digest::SHA512
 
   ##
   # Used internally to select the signing digest from all computed digests
 
-  DIGEST_NAME = # :nodoc:
-    if DIGEST_ALGORITHM then
-      DIGEST_ALGORITHM.new.name
-    end
+  DIGEST_NAME = DIGEST_ALGORITHM.name.split("::").last.downcase
 
   ##
   # Algorithm for creating the key pair used to sign gems

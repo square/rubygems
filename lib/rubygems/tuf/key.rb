@@ -32,8 +32,8 @@ module Gem::TUF
       when 'insecure'
         Digest::MD5.hexdigest(public + content)
       when 'rsa'
-        rsa_key = OpenSSL::PKey::RSA.new(private)
-        rsa_key.sign(Gem::TUF::DIGEST_ALGORITHM.new, content).unpack("H*")[0]
+        rsa_key = Gem::TUF::KEY_ALGORITHM.new(private)
+        rsa_key.sign(digest, content).unpack("H*")[0]
       else raise "Unknown key type: #{type}"
       end
     end
@@ -44,8 +44,8 @@ module Gem::TUF
         expected_digest == Digest::MD5.hexdigest(public + content)
       when 'rsa'
         signature_bytes = [expected_digest].pack("H*")
-        rsa_key = OpenSSL::PKey::RSA.new(public)
-        rsa_key.verify(Gem::TUF::DIGEST_ALGORITHM.new, signature_bytes, content)
+        rsa_key = Gem::TUF::KEY_ALGORITHM.new(public)
+        rsa_key.verify(digest, signature_bytes, content)
       else raise "Unknown key type: #{type}"
       end
     end
@@ -61,5 +61,11 @@ module Gem::TUF
     end
 
     attr_reader :id, :public, :private, :type
+
+    private
+
+    def digest
+      @digest ||= OpenSSL::Digest.new(Gem::TUF::DIGEST_NAME)
+    end
   end
 end

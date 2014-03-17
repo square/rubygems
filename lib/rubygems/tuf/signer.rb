@@ -9,13 +9,13 @@ module Gem::TUF
       #
       # TODO: handle signing with the same key twice.
       def sign(wrapped_document, key)
-        unwrapped = wrapped_document.fetch('signed') {
-          raise "The given document is not wrapped in a signing envelope"
-        }
+        unwrapped = unwrap_unsafe(wrapped_document)
 
         to_sign = Gem::TUF::Serialize.canonical(unwrapped)
 
         signed = wrapped_document.dup
+
+        signed['signatures'] ||= []
         signed['signatures'] << {
           'keyid'  => key.id,
           'method' => key.type,

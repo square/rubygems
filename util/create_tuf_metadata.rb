@@ -1,7 +1,6 @@
 $LOAD_PATH << File.expand_path("../../lib", __FILE__)
 
 require 'openssl'
-require 'digest/sha2'
 require 'json'
 require 'rubygems/util/canonical_json'
 require 'rubygems/tuf'
@@ -11,14 +10,14 @@ ROLE_NAMES = %w[root targets timestamp release mirrors]
 TARGET_ROLES = %w[targets/claimed targets/recently-claimed targets/unclaimed]
 
 def make_key_pair role_name
-  key = OpenSSL::PKey::RSA.new(2048,65537)
+  key = Gem::TUF::KEY_ALGORITHM.new(2048,65537)
   File.write "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem", key.to_pem
   File.write "test/rubygems/tuf/#{role_name.gsub('/', '-')}-public.pem", key.public_key.to_pem
   key
 end
 
 def deserialize_role_key role_name
-  OpenSSL::PKey::RSA.new File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
+  Gem::TUF::KEY_ALGORITHM.new File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
 end
 
 def key_id key
@@ -52,9 +51,9 @@ class Role
 end
 
 def write_signed_metadata(role, metadata)
-  key = deserialize_role_key(role)
-  signer = Gem::TUF::Signer.new(key)
-  signed_content = signer.sign("signed" => metadata)
+  rsa_key = deserialize_role_key(role)
+  key = Gem::TUF::Key.build("rsa", rsa_key.to_pem, rsa_key.public_key.to_pem)
+  signed_content = Gem::TUF::Signer.sign({"signed" => metadata}, key)
   File.write("test/rubygems/tuf/#{role}.txt", JSON.pretty_generate(signed_content))
 end
 
@@ -119,7 +118,7 @@ def generate_test_timestamp
     "ts"      =>  Time.now.utc.to_s,
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
     "meta" => { "release.txt" =>
-                { "hashes" => { "sha256" => Digest::SHA256.hexdigest(release_contents) },
+                { "hashes" => { "sha512" => Gem::TUF::DIGEST_ALGORITHM.hexdigest(release_contents) },
                   "length" => release_contents.length,
                 },
               },
@@ -137,14 +136,20 @@ def generate_test_release
     "ts"      =>  Time.now.utc.to_s,
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
     "meta" => { "root.txt" =>
-                { "hashes" => { "sha256" => Digest::SHA256.hexdigest(root_contents) },
+                { "hashes" => {
+                    Gem::TUF::DIGEST_NAME =>
+                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(root_contents)
+                  },
                   "length" => root_contents.length,
                 },
 
                 "targets.txt" =>
-                 { "hashes" => { "sha256" => Digest::SHA256.hexdigest(targets_contents) },
-                   "length" => targets_contents.length,
-                 },
+                { "hashes" => {
+                    Gem::TUF::DIGEST_NAME =>
+                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(targets_contents)
+                  },
+                  "length" => targets_contents.length,
+                },
               },
     }
 
