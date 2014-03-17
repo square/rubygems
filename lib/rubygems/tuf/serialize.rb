@@ -1,8 +1,9 @@
+require 'rubygems/util/canonical_json'
+
 module Gem::TUF
   class Serialize
     def self.canonical(document)
-      # TODO: Use CanonicalJSON
-      JSON.pretty_generate(document)
+      CanonicalJSON.dump(document)
     end
 
     def self.roundtrip(document)
