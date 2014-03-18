@@ -132,7 +132,10 @@ def generate_test_timestamp
     "ts"      =>  Time.now.utc.to_s,
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
     "meta" => { "release.txt" =>
-                { "hashes" => { "sha512" => Gem::TUF::DIGEST_ALGORITHM.hexdigest(release_contents) },
+                { "hashes" => {
+                    Gem::TUF::DIGEST_NAME =>
+                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(release_contents)
+                  },
                   "length" => release_contents.length,
                 },
               },
