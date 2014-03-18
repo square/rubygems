@@ -52,7 +52,7 @@ end
 
 def write_signed_metadata(role, metadata)
   rsa_key = deserialize_role_key(role)
-  key = Gem::TUF::Key.build("rsa", rsa_key.to_pem, rsa_key.public_key.to_pem)
+  key = Gem::TUF::Key.private_key(rsa_key)
   signed_content = Gem::TUF::Signer.sign({"signed" => metadata}, key)
   File.write("test/rubygems/tuf/#{role}.txt", JSON.pretty_generate(signed_content))
 end
@@ -67,7 +67,7 @@ def generate_test_root
   public_keys = {}
   ROLE_NAMES.each do |role|
     private_role_key = make_key_pair role
-    public_role_key = Gem::TUF::Key.public("rsa", private_role_key.public_key)
+    public_role_key = Gem::TUF::Key.public_key(private_role_key.public_key)
 
     role_keys[role] = private_role_key
     metadata[role] = role_metadata public_role_key

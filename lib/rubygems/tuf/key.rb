@@ -6,19 +6,26 @@ module Gem::TUF
   # Value object for working with TUF key hashes.
   class Key
 
-    # Convenience method for programatically building keys.
+    # Convenience methods for programatically building keys.
+    def self.private_key(private)
+      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{private.class}" unless private.is_a? Gem::TUF::KEY_ALGORITHM
+      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a public key!!?" unless private.private?
+
+      build("rsa", private.to_pem, private.public_key.to_pem)
+    end
+
+    def self.public_key(public)
+      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{public.class}" unless public.is_a? Gem::TUF::KEY_ALGORITHM
+      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a private key!!!" if public.private?
+
+      build("rsa", "", public.to_pem)
+    end
+
     def self.build(type, private, public)
       new Gem::TUF::Serialize.roundtrip(
         'keytype' => type,
         'keyval' => {'private' => private, 'public' => public}
       )
-    end
-
-    def self.public(type, public)
-      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{public.class}" unless public.is_a? Gem::TUF::KEY_ALGORITHM
-      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a private key!!!" if public.private?
-
-      build(type, "", public.to_pem)
     end
 
     def initialize(key)

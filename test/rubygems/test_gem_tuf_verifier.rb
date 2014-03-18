@@ -9,8 +9,8 @@ class TestGemTUFVerifier < Gem::TestCase
   def setup
     super
 
-    @public_key = Gem::TUF::Key.public("rsa", PUBLIC_KEY)
-    @private_key = Gem::TUF::Key.build("rsa", PRIVATE_KEY.to_pem, PRIVATE_KEY.public_key.to_pem)
+    @public_key = Gem::TUF::Key.public_key(PUBLIC_KEY)
+    @private_key = Gem::TUF::Key.private_key(PRIVATE_KEY)
     @signable = {
                   "signed" => {
                     "_type"   => "Example",
