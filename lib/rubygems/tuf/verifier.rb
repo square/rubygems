@@ -35,7 +35,7 @@ class Gem::TUF::Verifier
     if verified_count >= @threshold
       signed
     else
-      raise Gem::TUF::VerificationError, "failed to meet threshhold of valid signatures (#{verified_count} of #{@threshhold})"
+      raise Gem::TUF::VerificationError, "failed to meet threshhold of valid signatures (#{verified_count} of #{@threshold})"
     end
   end
 end
