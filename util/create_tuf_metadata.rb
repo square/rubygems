@@ -58,7 +58,7 @@ def write_signed_metadata(role, metadata)
 end
 
 def role_metadata key
-  { "keyids" => [key.keyid], "threshold" => 1}
+  { "keyids" => [key.id], "threshold" => 1}
 end
 
 def generate_test_root
@@ -67,11 +67,11 @@ def generate_test_root
   public_keys = {}
   ROLE_NAMES.each do |role|
     private_role_key = make_key_pair role
-    public_role_key = Gem::TUF::PublicKey.new(private_role_key.public_key)
+    public_role_key = Gem::TUF::Key.public("rsa", private_role_key.public_key)
 
     role_keys[role] = private_role_key
     metadata[role] = role_metadata public_role_key
-    public_keys[public_role_key.keyid] = public_role_key.as_json
+    public_keys[public_role_key.id] = public_role_key.to_hash
   end
 
   root = {

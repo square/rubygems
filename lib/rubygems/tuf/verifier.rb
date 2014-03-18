@@ -24,11 +24,11 @@ class Gem::TUF::Verifier
     verified_count = 0
 
     signatures.each do |signature|
-      key = @keys.find { |key| key.keyid == signature['keyid'] }
+      key = @keys.find { |key| key.id == signature['keyid'] }
       next unless key
 
-      signature_bytes = [signature['sig']].pack("H*")
-      verified = key.verify(signature_bytes, to_verify)
+      signature = signature['sig']
+      verified = key.verify(signature, to_verify)
       verified_count += 1 if verified
     end
 

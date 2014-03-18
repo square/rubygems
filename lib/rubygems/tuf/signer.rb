@@ -69,7 +69,7 @@ module Gem::TUF
           method = sig.fetch('method')
 
           key = keystore.fetch(key_id)
-          key.valid_digest?(document, sig.fetch('sig')) ||
+          key.verify(sig.fetch('sig'), document) ||
             raise("Invalid signature for #{key_id}")
         end
       end

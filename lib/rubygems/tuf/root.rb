@@ -13,9 +13,9 @@ class Gem::TUF::Root
 
     root_txt['signed']['keys'].each do |keyid, data|
       rsa_key     = OpenSSL::PKey::RSA.new data['keyval']['public']
-      public_key  = Gem::TUF::PublicKey.new rsa_key
+      public_key  = Gem::TUF::Key.public "rsa", rsa_key
 
-      unless public_key.keyid == keyid
+      unless public_key.id == keyid
         raise "internal inconsistency: keyid #{public_key.keyid} does not match expected #{keyid}"
       end
 

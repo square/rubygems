@@ -15,7 +15,10 @@ module Gem::TUF
     end
 
     def self.public(type, public)
-      build(type, "", public)
+      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{public.class}" unless public.is_a? Gem::TUF::KEY_ALGORITHM
+      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a private key!!!" if public.private?
+
+      build(type, "", public.to_pem)
     end
 
     def initialize(key)
@@ -23,7 +26,7 @@ module Gem::TUF
       @public  = key.fetch('keyval').fetch('public')
       @private = key.fetch('keyval').fetch('private')
       @type    = key.fetch('keytype')
-      @id      = Digest::SHA256.hexdigest(Gem::TUF::Serialize.canonical(to_hash))
+      generate_id
     end
 
     # TODO: Unsupported for public key
@@ -38,14 +41,14 @@ module Gem::TUF
       end
     end
 
-    def valid_digest?(content, expected_digest)
+    def verify(signature, data)
       case type
       when 'insecure'
-        expected_digest == Digest::MD5.hexdigest(public + content)
+        signature == Digest::MD5.hexdigest(public + data)
       when 'rsa'
-        signature_bytes = [expected_digest].pack("H*")
+        signature_bytes = [signature].pack("H*")
         rsa_key = Gem::TUF::KEY_ALGORITHM.new(public)
-        rsa_key.verify(digest, signature_bytes, content)
+        rsa_key.verify(digest, signature_bytes, data)
       else raise "Unknown key type: #{type}"
       end
     end
@@ -63,6 +66,11 @@ module Gem::TUF
     attr_reader :id, :public, :private, :type
 
     private
+
+    def generate_id
+      json = Gem::TUF::Serialize.canonical(to_hash)
+      @id = Digest::SHA256.hexdigest(json)
+    end
 
     def digest
       @digest ||= OpenSSL::Digest.new(Gem::TUF::DIGEST_NAME)
