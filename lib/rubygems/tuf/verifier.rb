@@ -2,7 +2,7 @@
 # Verify signed JSON documents in The Update Framework (TUF) format
 
 class Gem::TUF::Verifier
-  def initialize keys, threshold = 1, now = Time.now
+  def initialize keys, threshold = 1
     @keys, @threshold = keys, threshold
   end
 
