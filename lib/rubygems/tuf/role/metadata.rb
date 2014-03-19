@@ -10,11 +10,21 @@ module Gem::TUF
     end
 
     class Metadata
+
+      def self.build(expires_in, metadata, now = Time.now)
+        new({
+          "ts"       => now.utc.to_s,
+          "expires"  => (now.utc + expires_in).to_s,
+          "meta"     => build_metadata(metadata)
+        }, NullBucket.new)
+      end
+
       def self.empty(bucket = NullBucket.new)
         new({'meta' => {}}, bucket)
       end
 
       def initialize(source, bucket)
+        @source = source
         @role_metadata = source['meta']
         @bucket = bucket
       end
@@ -39,28 +49,42 @@ module Gem::TUF
         role_metadata[file.path] = file.to_hash
       end
 
-      attr_reader :role_metadata, :bucket
+      def to_hash
+        {
+          '_type'   => type,
+          'ts'      => source.fetch('ts'),
+          'expires' => source.fetch('expires'),
+          'meta'    => role_metadata,
+          'version' => 2
+        }
+      end
+
+      def type
+        self.class.name.split('::').last
+      end
+
+      attr_reader :source, :role_metadata, :bucket
+
+      protected
+
+      def self.build_metadata(metadata)
+        metadata.map do |path, content|
+          [path,  { 'hashes' => hash(content), 'length' => content.length }]
+        end.to_h
+      end
+
+      def self.hash(content)
+        {
+          Gem::TUF::HASH_ALGORITHM_NAME =>
+            Gem::TUF::HASH_ALGORITHM.hexdigest(content)
+        }
+      end
     end
 
     class Timestamp < Metadata
-      def to_hash
-        {
-          '_type'   => "Timestamp",
-          'meta'    => role_metadata,
-          'version' => 2
-        }
-      end
     end
 
     class Release < Metadata
-      # TODO: Expires
-      def to_hash
-        {
-          '_type'   => "Release",
-          'meta'    => role_metadata,
-          'version' => 2
-        }
-      end
     end
   end
 end

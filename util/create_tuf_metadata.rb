@@ -49,6 +49,12 @@ class Role
   end
 end
 
+def metadata_for_roles(roles)
+  roles.map do |role|
+    ["#{role}.txt", File.read("test/rubygems/tuf/#{role}.txt")]
+  end.to_h
+end
+
 def write_signed_metadata(role, metadata)
   rsa_key = deserialize_role_key(role)
   key = Gem::TUF::Key.private_key(rsa_key)
@@ -105,49 +111,19 @@ def generate_test_targets
 end
 
 def generate_test_timestamp
-  release_contents = File.read 'test/rubygems/tuf/release.txt' # TODO
-  timestamp = {
-    "_type"   => "Timestamp",
-    "ts"      =>  Time.now.utc.to_s,
-    "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
-    "meta" => { "release.txt" =>
-                { "hashes" => {
-                    Gem::TUF::HASH_ALGORITHM_NAME =>
-                      Gem::TUF::HASH_ALGORITHM.hexdigest(release_contents)
-                  },
-                  "length" => release_contents.length,
-                },
-              },
-    }
+  metadata  = metadata_for_roles %w(release)
+
+  # TODO: There is a recommend value in spec
+  timestamp = Gem::TUF::Role::Timestamp.build(10000, metadata).to_hash
 
   write_signed_metadata("timestamp", timestamp)
 end
 
 def generate_test_release
-  root_contents = File.read 'test/rubygems/tuf/root.txt'
-  targets_contents = File.read 'test/rubygems/tuf/targets.txt'
+  metadata = metadata_for_roles %w(root targets)
 
-  release = {
-    "_type"   => "Release",
-    "ts"      =>  Time.now.utc.to_s,
-    "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
-    "meta" => { "root.txt" =>
-                { "hashes" => {
-                    Gem::TUF::HASH_ALGORITHM_NAME =>
-                      Gem::TUF::HASH_ALGORITHM.hexdigest(root_contents)
-                  },
-                  "length" => root_contents.length,
-                },
-
-                "targets.txt" =>
-                { "hashes" => {
-                    Gem::TUF::HASH_ALGORITHM_NAME =>
-                      Gem::TUF::HASH_ALGORITHM.hexdigest(targets_contents)
-                  },
-                  "length" => targets_contents.length,
-                },
-              },
-    }
+  # TODO: There is a recommend value in spec
+  release = Gem::TUF::Role::Release.build(10000, metadata).to_hash
 
   write_signed_metadata("release", release)
 end
