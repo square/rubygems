@@ -50,23 +50,16 @@ def generate_test_root
   roles = {}
   keys = {}
 
-  ROLE_NAMES.each do |role|
+  root = Gem::TUF::Role::Root.empty
+
+  roles = ROLE_NAMES.map do |role|
     key = make_key_pair role
-    keys[key.id] = key.to_hash
-    roles[role] = Gem::TUF::Role::RoleSpec.new([key]).metadata
+    Gem::TUF::Role::RoleSpec.new(role, [key])
   end
 
-  root = {
-    "_type"   => "Root",
-    "ts"      =>  Time.now.utc.to_s,
-    "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
-    "keys"    => keys,
-    "roles"   => roles,
-      # TODO: Once delegated targets are operational, the root
-      # targets.txt should use an offline key.
-  }
+  root.add_roles(roles)
 
-  write_signed_metadata("root", root)
+  write_signed_metadata("root", root.to_hash)
 end
 
 def generate_test_targets
@@ -76,7 +69,7 @@ def generate_test_targets
 
   TARGET_ROLES.each do |role|
     key = make_key_pair role
-    role_spec = Gem::TUF::Role::RoleSpec.new([key], 1, role, [])
+    role_spec = Gem::TUF::Role::RoleSpec.new(role, [key], 1, [])
     targets.delegate_to(role_spec)
   end
 

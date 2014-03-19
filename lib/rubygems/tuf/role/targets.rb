@@ -58,7 +58,7 @@ module Gem::TUF
           keys[key.id] = key.to_hash
         end
 
-        delegated_roles << role_spec.metadata
+        delegations << role_spec.metadata
       end
 
       def files
@@ -69,7 +69,7 @@ module Gem::TUF
         @root['keys'] ||= {}
       end
 
-      def delegated_roles
+      def delegations
         @root['roles'] ||= []
       end
 
@@ -81,17 +81,11 @@ module Gem::TUF
         "targets/#{role}"
       end
 
-      def delegations
-        @root['roles']
-      end
-
       private
 
       attr_reader :root
 
       def key(key_id)
-        keys = root.fetch('keys', {})
-
         Gem::TUF::Key.new(keys.fetch(key_id))
       end
 

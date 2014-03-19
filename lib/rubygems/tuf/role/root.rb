@@ -35,26 +35,18 @@ module Gem::TUF
         signed
       end
 
-      def add_roles(roles)
-        roles.each do |name, keys|
-          keys.each do |key|
-            @root['keys'][key.id] ||= key.to_hash
+      def add_roles(role_specs)
+        role_specs.each do |role_spec|
+          role_spec.keys.each do |key|
+            keys[key.id] ||= key.to_hash
           end
 
-          @root['roles'][name] = { 'keyids' => keys.map {|x| x.id }}
+          roles[role_spec.role] = role_spec.metadata(false)
         end
       end
 
       def to_hash
-        @root.merge('_type' => 'Root')
-      end
-
-      def files
-        @target.fetch('targets')
-      end
-
-      def delegated_roles
-        @root.fetch('roles', [])
+        {'_type' => 'Root'}.merge(@root)
       end
 
       def fetch(key_id)
@@ -62,7 +54,15 @@ module Gem::TUF
       end
 
       def path_for(role)
-        role
+        "#{role}.txt"
+      end
+
+      def keys
+        @root['keys'] ||= {}
+      end
+
+      def roles
+        @root['roles'] ||= {}
       end
 
       def delegations
@@ -74,8 +74,6 @@ module Gem::TUF
       attr_reader :root
 
       def key(key_id)
-        keys = root.fetch('keys', {})
-
         Gem::TUF::Key.new(keys.fetch(key_id) {
           raise "#{key_id} not found among:\n#{keys.keys.join("\n")}"
         })
