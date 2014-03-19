@@ -5,7 +5,9 @@ module Gem::TUF
   module Role
     # TODO: DRY this up with Root role
     class Targets
-      def self.empty(expires_in, timestamp=Time.now)
+      DEFAULT_EXPIRY = 86400 * 365 # 1 year
+
+      def self.empty(version = 1, expires_in = DEFAULT_EXPIRY, timestamp = Time.now)
         new({
           'ts'          => timestamp.utc.to_s,
           'expires'     => (timestamp.utc + expires_in).to_s,

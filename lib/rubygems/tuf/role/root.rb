@@ -5,8 +5,16 @@ module Gem::TUF
   module Role
     # TODO: DRY this up with Targets role
     class Root
-      def self.empty
-        new({ 'keys' => {}, 'roles' => {}})
+      DEFAULT_EXPIRY = 86400 * 365 # 1 year
+
+      def self.empty(version = 1, expires_in = DEFAULT_EXPIRY, timestamp = Time.now)
+        new({
+          'version' => version,
+          'ts'      => timestamp.utc.to_s,
+          'expires' => (timestamp.utc + expires_in).to_s,
+          'keys'    => {},
+          'roles'   => {}
+        })
       end
 
       def initialize(content)
@@ -65,8 +73,8 @@ module Gem::TUF
         @root['roles'] ||= {}
       end
 
-      def delegations
-        @root['roles']
+      def version
+        @root.fetch('version')
       end
 
       private

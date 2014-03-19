@@ -62,8 +62,7 @@ end
 
 def generate_test_targets
   # TODO: multiple target files
-  # TODO: There is a recommend value in spec
-  targets = Gem::TUF::Role::Targets.empty(10000)
+  targets = Gem::TUF::Role::Targets.empty
 
   TARGET_ROLES.each do |role|
     key = make_key_pair role
