@@ -33,22 +33,6 @@ def deserialize_role_key role_name
   File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
 end
 
-class Role
-  def initialize(keyids, threshold=1, name=nil, paths=nil)
-    @name = name
-    @keyids = keyids
-    @paths = paths
-    @threshold = threshold
-  end
-
-  def metadata
-    result = { "keyids" => @keyids, "threshold" => @threshold }
-    result["paths"] = @paths unless @paths.nil?
-    result["name"] = @name unless @name.nil?
-    result
-  end
-end
-
 def metadata_for_roles(roles)
   roles.map do |role|
     ["#{role}.txt", File.read("test/rubygems/tuf/#{role}.txt")]
@@ -68,9 +52,8 @@ def generate_test_root
 
   ROLE_NAMES.each do |role|
     key = make_key_pair role
-    key_digest = key.id
-    keys[key_digest] = key.to_hash
-    roles[role] = Role.new([key_digest]).metadata
+    keys[key.id] = key.to_hash
+    roles[role] = Gem::TUF::Role::RoleSpec.new([key]).metadata
   end
 
   root = {
@@ -88,26 +71,16 @@ end
 
 def generate_test_targets
   # TODO: multiple target files
-
-  roles = {}
-  keys = {}
+  # TODO: There is a recommend value in spec
+  targets = Gem::TUF::Role::Targets.empty(10000)
 
   TARGET_ROLES.each do |role|
     key = make_key_pair role
-    key_digest = key.id
-    keys[key_digest] = key.to_hash
-    roles[role] = Role.new([key_digest], 1, role, []).metadata
+    role_spec = Gem::TUF::Role::RoleSpec.new([key], 1, role, [])
+    targets.delegate_to(role_spec)
   end
 
-  targets = {
-    "_type"   => "Targets",
-    "ts"      =>  Time.now.utc.to_s,
-    "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
-    "delegations" => {"roles" => roles.values, "keys" => keys},
-    "targets" => {}
-    }
-
-  write_signed_metadata("targets", targets)
+  write_signed_metadata("targets", targets.to_hash)
 end
 
 def generate_test_timestamp
