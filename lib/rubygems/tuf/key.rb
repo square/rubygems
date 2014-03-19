@@ -22,10 +22,13 @@ module Gem::TUF
     end
 
     def self.build(type, private, public)
-      new Gem::TUF::Serialize.roundtrip(
+      new({
         'keytype' => type,
-        'keyval' => {'private' => private, 'public' => public}
-      )
+        'keyval' => {
+          'private' => private,
+          'public' => public
+        }
+      })
     end
 
     def initialize(key)
@@ -75,7 +78,7 @@ module Gem::TUF
     private
 
     def generate_id
-      json = Gem::TUF::Serialize.canonical(to_hash)
+      json = Gem::TUF::Serialize.dump(to_hash)
       @id = Digest::SHA256.hexdigest(json)
     end
 

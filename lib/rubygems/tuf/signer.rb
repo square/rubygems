@@ -11,7 +11,7 @@ module Gem::TUF
       def sign(wrapped_document, key)
         unwrapped = unwrap_unsafe(wrapped_document)
 
-        to_sign = Gem::TUF::Serialize.canonical(unwrapped)
+        to_sign = Gem::TUF::Serialize.dump(unwrapped)
 
         signed = wrapped_document.dup
 
@@ -62,7 +62,7 @@ module Gem::TUF
       private
 
       def verify!(signed_document, keystore)
-        document = Gem::TUF::Serialize.canonical(unwrap_unsafe(signed_document))
+        document = Gem::TUF::Serialize.dump(unwrap_unsafe(signed_document))
 
         signed_document.fetch('signatures').each do |sig|
           key_id = sig.fetch('keyid')

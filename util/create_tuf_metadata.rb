@@ -1,8 +1,6 @@
 $LOAD_PATH << File.expand_path("../../lib", __FILE__)
 
 require 'openssl'
-require 'json'
-require 'rubygems/util/canonical_json'
 require 'rubygems/tuf'
 require 'time'
 
@@ -27,29 +25,15 @@ def make_key_pair role_name
   # data if the public_key is already correct.
   File.write public_key_file, key.public_key.to_pem
 
-  key
+  Gem::TUF::Key.private_key(key)
 end
 
 def deserialize_role_key role_name
   Gem::TUF::KEY_ALGORITHM.new File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
 end
 
-def key_id key
-  Digest::SHA256.hexdigest CanonicalJSON.dump(key_to_hash(key).to_json)
-end
-
-def key_to_hash key
-  key_hash = {}
-  key_hash["keytype"] = "rsa"
-  key_hash["keyval"] = {}
-  key_hash["keyval"]["private"] = ""
-  key_hash["keyval"]["public"] = key.public_key.to_pem
-  key_hash
-end
-
 class Role
-
-  def initialize(keyids, name=nil, paths=nil, threshold=1)
+  def initialize(keyids, threshold=1, name=nil, paths=nil)
     @name = name
     @keyids = keyids
     @paths = paths
@@ -71,29 +55,23 @@ def write_signed_metadata(role, metadata)
   File.write("test/rubygems/tuf/#{role}.txt", JSON.pretty_generate(signed_content))
 end
 
-def role_metadata key
-  { "keyids" => [key.id], "threshold" => 1}
-end
-
 def generate_test_root
-  metadata = {}
-  role_keys = {}
-  public_keys = {}
-  ROLE_NAMES.each do |role|
-    private_role_key = make_key_pair role
-    public_role_key = Gem::TUF::Key.public_key(private_role_key.public_key)
+  roles = {}
+  keys = {}
 
-    role_keys[role] = private_role_key
-    metadata[role] = role_metadata public_role_key
-    public_keys[public_role_key.id] = public_role_key.to_hash
+  ROLE_NAMES.each do |role|
+    key = make_key_pair role
+    key_digest = key.id
+    keys[key_digest] = key.to_hash
+    roles[role] = Role.new([key_digest]).metadata
   end
 
   root = {
     "_type"   => "Root",
     "ts"      =>  Time.now.utc.to_s,
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
-    "keys"    => public_keys,
-    "roles"   => metadata,
+    "keys"    => keys,
+    "roles"   => roles,
       # TODO: Once delegated targets are operational, the root
       # targets.txt should use an offline key.
   }
@@ -109,9 +87,9 @@ def generate_test_targets
 
   TARGET_ROLES.each do |role|
     key = make_key_pair role
-    key_digest = key_id key
-    keys[key_digest] = key_to_hash(key)
-    roles[role] = Role.new([key_digest], role, [], 1).metadata
+    key_digest = key.id
+    keys[key_digest] = key.to_hash
+    roles[role] = Role.new([key_digest], 1, role, []).metadata
   end
 
   targets = {
