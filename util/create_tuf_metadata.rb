@@ -112,8 +112,8 @@ def generate_test_timestamp
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
     "meta" => { "release.txt" =>
                 { "hashes" => {
-                    Gem::TUF::DIGEST_NAME =>
-                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(release_contents)
+                    Gem::TUF::HASH_ALGORITHM_NAME =>
+                      Gem::TUF::HASH_ALGORITHM.hexdigest(release_contents)
                   },
                   "length" => release_contents.length,
                 },
@@ -133,16 +133,16 @@ def generate_test_release
     "expires" => (Time.now.utc + 10000).to_s, # TODO: There is a recommend value in pec
     "meta" => { "root.txt" =>
                 { "hashes" => {
-                    Gem::TUF::DIGEST_NAME =>
-                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(root_contents)
+                    Gem::TUF::HASH_ALGORITHM_NAME =>
+                      Gem::TUF::HASH_ALGORITHM.hexdigest(root_contents)
                   },
                   "length" => root_contents.length,
                 },
 
                 "targets.txt" =>
                 { "hashes" => {
-                    Gem::TUF::DIGEST_NAME =>
-                      Gem::TUF::DIGEST_ALGORITHM.hexdigest(targets_contents)
+                    Gem::TUF::HASH_ALGORITHM_NAME =>
+                      Gem::TUF::HASH_ALGORITHM.hexdigest(targets_contents)
                   },
                   "length" => targets_contents.length,
                 },

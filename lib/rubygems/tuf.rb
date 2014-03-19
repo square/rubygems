@@ -2,27 +2,14 @@ require 'digest/sha2'
 
 module Gem::TUF
   ##
-  # Digest algorithm used to sign gems
+  # Hash algorithm used to generate target hashes
 
-  DIGEST_ALGORITHM = Digest::SHA512
-
-  ##
-  # Used internally to select the signing digest from all computed digests
-
-  DIGEST_NAME = DIGEST_ALGORITHM.name.split("::").last.downcase
+  HASH_ALGORITHM = Digest::SHA256
 
   ##
-  # Algorithm for creating the key pair used to sign gems
+  # Name of the Hash algorithm used
 
-  KEY_ALGORITHM =
-    if defined?(OpenSSL::PKey) then
-      OpenSSL::PKey::RSA
-    end
-
-  ##
-  # Length of keys created by KEY_ALGORITHM
-
-  KEY_LENGTH = 2048
+  HASH_ALGORITHM_NAME = HASH_ALGORITHM.name.split('::').last.downcase
 
   class VerificationError < StandardError; end
 end

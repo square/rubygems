@@ -106,7 +106,7 @@ module Gem::TUF
 
     def generate_id
       json = Gem::TUF::Serialize.dump(to_hash)
-      @id = Digest::SHA256.hexdigest(json)
+      @id = Gem::TUF::HASH_ALGORITHM.hexdigest(json)
     end
   end
 end

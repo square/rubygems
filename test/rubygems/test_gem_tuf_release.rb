@@ -28,7 +28,7 @@ class TestRelease < Gem::TestCase
   end
 
   def test_has_targets
-    assert release.targets["hashes"]["sha512"]
+    assert release.targets["hashes"][Gem::TUF::HASH_ALGORITHM_NAME]
     assert release.targets["length"]
   end
 

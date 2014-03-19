@@ -19,8 +19,8 @@ class Gem::TUF::Release
 
   def current_digest(type, current_root_txt)
     case type
-    when Gem::TUF::DIGEST_NAME
-     Gem::TUF::DIGEST_ALGORITHM.hexdigest(current_root_txt)
+    when Gem::TUF::HASH_ALGORITHM_NAME
+     Gem::TUF::HASH_ALGORITHM.hexdigest(current_root_txt)
     else
      raise UnsupportedDigest
     end

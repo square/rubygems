@@ -14,12 +14,12 @@ module Gem::TUF
       @path   = path
       @body   = body
       @length = body.bytesize
-      @hash   = Digest::SHA256.hexdigest(@body)
+      @hash   = Gem::TUF::HASH_ALGORITHM.hexdigest(@body)
     end
 
     def to_hash
       {
-        'hashes' => { 'sha256' => @hash },
+        'hashes' => { Gem::TUF::HASH_ALGORITHM_NAME => @hash },
         'length' => @length,
       }
     end
@@ -40,7 +40,7 @@ module Gem::TUF
 
     def initialize(path, metadata)
       @path   = path
-      @hash   = metadata.fetch('hashes').fetch('sha256')
+      @hash   = metadata.fetch('hashes').fetch(Gem::TUF::HASH_ALGORITHM_NAME)
       @length = metadata.fetch('length')
     end
 
