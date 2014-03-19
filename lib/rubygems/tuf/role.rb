@@ -16,5 +16,27 @@ module Gem::TUF
       end.new(content)
     end
     module_function :from_hash
+
+    class RoleSpec
+      def initialize(role, keys, threshold=1, paths=nil)
+        @role = role
+        @keys = keys
+        @threshold = threshold
+        @paths = paths
+      end
+
+      def metadata(include_role_name=false)
+        result = { "keyids" => keyids, "threshold" => @threshold }
+        result["paths"] = @paths unless @paths.nil?
+        result["name"] = @role if include_role_name
+        result
+      end
+
+      def keyids
+        @keys.map { |key| key.id }
+      end
+
+      attr_reader :keys, :threshold, :role, :paths
+    end
   end
 end

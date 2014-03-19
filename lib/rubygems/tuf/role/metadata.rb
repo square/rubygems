@@ -10,12 +10,17 @@ module Gem::TUF
     end
 
     class Metadata
-      def self.empty(bucket = NullBucket.new)
-        new({'meta' => {}}, bucket)
+      DEFAULT_EXPIRY = 86400 # 1 day
+
+      def self.empty(expires_in = DEFAULT_EXPIRY, now = Time.now, bucket = NullBucket.new)
+        new({
+              "ts"      => now.utc.to_s,
+              "expires" => (now.utc + expires_in).to_s,
+            }, bucket)
       end
 
       def initialize(source, bucket)
-        @role_metadata = source['meta']
+        @source = source
         @bucket = bucket
       end
 
@@ -39,28 +44,28 @@ module Gem::TUF
         role_metadata[file.path] = file.to_hash
       end
 
-      attr_reader :role_metadata, :bucket
+      def role_metadata
+        source['meta'] ||= {}
+      end
+
+      def to_hash
+        {
+          '_type' => type,
+          'version' => 2
+        }.merge(source)
+      end
+
+      def type
+        self.class.name.split('::').last
+      end
+
+      attr_reader :source, :bucket
     end
 
     class Timestamp < Metadata
-      def to_hash
-        {
-          '_type'   => "Timestamp",
-          'meta'    => role_metadata,
-          'version' => 2
-        }
-      end
     end
 
     class Release < Metadata
-      # TODO: Expires
-      def to_hash
-        {
-          '_type'   => "Release",
-          'meta'    => role_metadata,
-          'version' => 2
-        }
-      end
     end
   end
 end

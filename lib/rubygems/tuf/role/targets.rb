@@ -5,8 +5,15 @@ module Gem::TUF
   module Role
     # TODO: DRY this up with Root role
     class Targets
-      def self.empty
-        new('delegations' => {}, 'targets' => {})
+      DEFAULT_EXPIRY = 86400 * 365 # 1 year
+
+      def self.empty(version = 1, expires_in = DEFAULT_EXPIRY, timestamp = Time.now)
+        new({
+          'ts'          => timestamp.utc.to_s,
+          'expires'     => (timestamp.utc + expires_in).to_s,
+          'delegations' => {},
+          'targets'     => {}
+        })
       end
 
       def initialize(content)
@@ -33,9 +40,7 @@ module Gem::TUF
       end
 
       def to_hash
-        @target.merge(
-          '_type' => 'Targets'
-        )
+        {'_type' => 'Targets'}.merge(@target)
       end
 
       def add_file(file)
@@ -50,23 +55,23 @@ module Gem::TUF
         @target['targets'][file.path] = file.to_hash
       end
 
-      def delegate_to(role_name, keys)
-        @root['keys'] ||= {}
-        keys.each do |key|
-          @root['keys'][key.id] = key.to_hash
+      def delegate_to(role_spec)
+        role_spec.keys.each do |key|
+          keys[key.id] = key.to_hash
         end
 
-        delegated_roles << {
-          'name' => role_name,
-          'keyids' => keys.map {|x| x.id }
-        }
+        delegations << role_spec.metadata
       end
 
       def files
         @target.fetch('targets')
       end
 
-      def delegated_roles
+      def keys
+        @root['keys'] ||= {}
+      end
+
+      def delegations
         @root['roles'] ||= []
       end
 
@@ -78,17 +83,11 @@ module Gem::TUF
         "targets/#{role}"
       end
 
-      def delegations
-        @root['roles']
-      end
-
       private
 
       attr_reader :root
 
       def key(key_id)
-        keys = root.fetch('keys', {})
-
         Gem::TUF::Key.new(keys.fetch(key_id))
       end
 

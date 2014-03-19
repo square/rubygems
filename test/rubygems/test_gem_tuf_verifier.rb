@@ -9,7 +9,8 @@ class TestGemTUFVerifier < Gem::TestCase
   def setup
     super
 
-    @public_key = Gem::TUF::PublicKey.new PUBLIC_KEY
+    @public_key = Gem::TUF::Key.public_key(PUBLIC_KEY)
+    @private_key = Gem::TUF::Key.private_key(PRIVATE_KEY)
     @signable = {
                   "signed" => {
                     "_type"   => "Example",
@@ -24,7 +25,7 @@ class TestGemTUFVerifier < Gem::TestCase
   end
 
   def test_verify
-    signed_json = Gem::TUF::Signer.new(PRIVATE_KEY).sign(@signable)
+    signed_json = Gem::TUF::Signer.sign(@signable, @private_key)
     verifier = Gem::TUF::Verifier.new([@public_key], 1)
     json = verifier.verify(signed_json)
 
@@ -35,7 +36,7 @@ class TestGemTUFVerifier < Gem::TestCase
     expired_signable = @signable.dup
     expired_signable['signed']['expires'] = "1970-01-01 00:00:00 UTC"
 
-    signed_json = Gem::TUF::Signer.new(PRIVATE_KEY).sign(expired_signable)
+    signed_json = Gem::TUF::Signer.sign(expired_signable, @private_key)
     verifier = Gem::TUF::Verifier.new([@public_key], 1)
     assert_raises Gem::TUF::VerificationError do
       verifier.verify(signed_json)

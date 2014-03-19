@@ -1,12 +1,8 @@
-# TODO: remove this dependency somehow
-require 'json'
-require 'rubygems/util/canonical_json'
-
 ##
 # Verify signed JSON documents in The Update Framework (TUF) format
 
 class Gem::TUF::Verifier
-  def initialize keys, threshold = 1, now = Time.now
+  def initialize keys, threshold = 1
     @keys, @threshold = keys, threshold
   end
 
@@ -20,22 +16,22 @@ class Gem::TUF::Verifier
     signatures = json['signatures']
     raise ArgumentError, "no signatures present" unless signatures
 
-    to_verify = CanonicalJSON.dump(signed)
+    to_verify = Gem::TUF::Serialize.dump(signed)
     verified_count = 0
 
     signatures.each do |signature|
-      key = @keys.find { |key| key.keyid == signature['keyid'] }
+      key = @keys.find { |key| key.id == signature['keyid'] }
       next unless key
 
-      signature_bytes = [signature['sig']].pack("H*")
-      verified = key.verify(signature_bytes, to_verify)
+      signature = signature['sig']
+      verified = key.verify(signature, to_verify)
       verified_count += 1 if verified
     end
 
     if verified_count >= @threshold
       signed
     else
-      raise Gem::TUF::VerificationError, "failed to meet threshhold of valid signatures (#{verified_count} of #{@threshhold})"
+      raise Gem::TUF::VerificationError, "failed to meet threshhold of valid signatures (#{verified_count} of #{@threshold})"
     end
   end
 end
