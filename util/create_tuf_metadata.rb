@@ -33,10 +33,8 @@ def deserialize_role_key role_name
   File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
 end
 
-def metadata_for_roles(roles)
-  roles.map do |role|
-    ["#{role}.txt", File.read("test/rubygems/tuf/#{role}.txt")]
-  end.to_h
+def file_for_role(role)
+  Gem::TUF::File.new("#{role}.txt", File.read("test/rubygems/tuf/#{role}.txt"))
 end
 
 def write_signed_metadata(role, metadata)
@@ -77,21 +75,20 @@ def generate_test_targets
 end
 
 def generate_test_timestamp
-  metadata  = metadata_for_roles %w(release)
+  timestamp = Gem::TUF::Role::Timestamp.empty
 
-  # TODO: There is a recommend value in spec
-  timestamp = Gem::TUF::Role::Timestamp.build(10000, metadata).to_hash
+  timestamp.replace file_for_role('release')
 
-  write_signed_metadata("timestamp", timestamp)
+  write_signed_metadata("timestamp", timestamp.to_hash)
 end
 
 def generate_test_release
-  metadata = metadata_for_roles %w(root targets)
+  release = Gem::TUF::Role::Release.empty
 
-  # TODO: There is a recommend value in spec
-  release = Gem::TUF::Role::Release.build(10000, metadata).to_hash
+  release.replace file_for_role('root')
+  release.replace file_for_role('targets')
 
-  write_signed_metadata("release", release)
+  write_signed_metadata("release", release.to_hash)
 end
 
 def generate_test_metadata
