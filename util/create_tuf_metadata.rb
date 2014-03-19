@@ -13,23 +13,24 @@ def make_key_pair role_name
 
   if File.exists? private_key_file
     # Read the existing private key from file
-    key = Gem::TUF::KEY_ALGORITHM.new(File.read(private_key_file))
+    private_key = File.read(private_key_file)
+    key = Gem::TUF::Key.private_key(private_key)
   else
     # Generate a new private key and write to file
-    key = Gem::TUF::KEY_ALGORITHM.new(2048,65537) unless key
-    File.write private_key_file, key.to_pem
+    key = Gem::TUF::Key.create_key
+    File.write private_key_file, key.private
   end
 
   # Always overwrite the public_key file in case it does not
   # match the private_key we have. This should write out the same
   # data if the public_key is already correct.
-  File.write public_key_file, key.public_key.to_pem
+  File.write public_key_file, key.public
 
-  Gem::TUF::Key.private_key(key)
+  key
 end
 
 def deserialize_role_key role_name
-  Gem::TUF::KEY_ALGORITHM.new File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
+  File.read "test/rubygems/tuf/#{role_name.gsub('/', '-')}-private.pem"
 end
 
 class Role

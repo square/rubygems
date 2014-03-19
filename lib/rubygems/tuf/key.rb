@@ -1,24 +1,43 @@
 require 'rubygems/tuf/serialize'
-require 'digest/sha2'
 
 module Gem::TUF
+  ##
+  # Digest algorithm used for TUF signatures
+
+  DIGEST_ALGORITHM =
+    if defined?(OpenSSL::Digest) then
+      OpenSSL::Digest::SHA1
+    end
+
+  ##
+  # Signature Algorithm used for TUF signatures
+
+  KEY_ALGORITHM =
+    if defined?(OpenSSL::PKey) then
+      OpenSSL::PKey::RSA
+    end
+
+  ##
+  # Length of keys created by KEY_ALGORITHM
+
+  KEY_LENGTH = 2048
 
   # Value object for working with TUF key hashes.
   class Key
 
     # Convenience methods for programatically building keys.
-    def self.private_key(private)
-      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{private.class}" unless private.is_a? Gem::TUF::KEY_ALGORITHM
-      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a public key!!?" unless private.private?
+    def self.private_key(private, algorithm = KEY_ALGORITHM)
+      key = algorithm.new(private)
+      raise TypeError, "ZOMG! #{algorithm} is a public key!!?" unless key.private?
 
-      build("rsa", private.to_pem, private.public_key.to_pem)
+      build("rsa", key.to_pem, key.public_key.to_pem)
     end
 
-    def self.public_key(public)
-      raise TypeError, "expecting a #{Gem::TUF::KEY_ALGORITHM}, got #{public.class}" unless public.is_a? Gem::TUF::KEY_ALGORITHM
-      raise TypeError, "ZOMG! #{Gem::TUF::KEY_ALGORITHM} is a private key!!!" if public.private?
+    def self.public_key(public, algorithm = KEY_ALGORITHM)
+      key = algorithm.new(public)
+      raise TypeError, "ZOMG! #{algorithm} is a private key!!!" if key.private?
 
-      build("rsa", "", public.to_pem)
+      build("rsa", "", key.to_pem)
     end
 
     def self.build(type, private, public)
@@ -29,6 +48,14 @@ module Gem::TUF
           'public' => public
         }
       })
+    end
+
+    ##
+    # Creates a new key pair of the specified +length+ and +algorithm+.  The
+    # default is a 2048 bit RSA key.
+
+    def self.create_key length = KEY_LENGTH, algorithm = KEY_ALGORITHM
+      private_key(algorithm.new(length))
     end
 
     def initialize(key)
@@ -45,8 +72,8 @@ module Gem::TUF
       when 'insecure'
         Digest::MD5.hexdigest(public + content)
       when 'rsa'
-        rsa_key = Gem::TUF::KEY_ALGORITHM.new(private)
-        rsa_key.sign(digest, content).unpack("H*")[0]
+        rsa_key = KEY_ALGORITHM.new(private)
+        rsa_key.sign(DIGEST_ALGORITHM.new, content).unpack("H*")[0]
       else raise "Unknown key type: #{type}"
       end
     end
@@ -57,8 +84,8 @@ module Gem::TUF
         signature == Digest::MD5.hexdigest(public + data)
       when 'rsa'
         signature_bytes = [signature].pack("H*")
-        rsa_key = Gem::TUF::KEY_ALGORITHM.new(public)
-        rsa_key.verify(digest, signature_bytes, data)
+        rsa_key = KEY_ALGORITHM.new(public)
+        rsa_key.verify(DIGEST_ALGORITHM.new, signature_bytes, data)
       else raise "Unknown key type: #{type}"
       end
     end
@@ -80,10 +107,6 @@ module Gem::TUF
     def generate_id
       json = Gem::TUF::Serialize.dump(to_hash)
       @id = Digest::SHA256.hexdigest(json)
-    end
-
-    def digest
-      @digest ||= OpenSSL::Digest.new(Gem::TUF::DIGEST_NAME)
     end
   end
 end
